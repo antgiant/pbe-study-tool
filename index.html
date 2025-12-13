@@ -10,24 +10,40 @@
   <div class="card">
     <h1>PBE Practice Engine</h1>
     <p>A tool to help you learn PBE verses by practicing fill in the blank questions.</p>
-    <div class="selectors">
-      <fieldset>
-        <legend>Season</legend>
-        <label for="year">Year</label>
-        <select id="year" name="year">
-          <option value=""></option>
-          <option value="2025-2026">2025-2026 - Isaiah 1-33</option>
-          <option value="2026-2027">2026-2027 - Mark, 1,2 Peter, & 1,2,3 John</option>
-          <option value="2027-2028">2027-2028 - Isaiah 34-66</option>
-        </select>
-      </fieldset>
-      <fieldset id="chapter-selector" style="display: none;">
-        <legend>Chapter selector</legend>
-        <label><input type="checkbox" id="select-all" /> Select all</label>
-        <div id="chapter-options"></div>
-      </fieldset>
+    <div class="selectors" id="selectors-container">
+      <button type="button" id="selectors-toggle" class="accordion-toggle">Settings ▾</button>
+      <div id="selectors-content">
+        <fieldset>
+          <legend>Season</legend>
+          <label for="year">Year</label>
+          <select id="year" name="year">
+            <option value=""></option>
+            <option value="2025-2026">2025-2026 - Isaiah 1-33</option>
+            <option value="2026-2027">2026-2027 - Mark, 1,2 Peter, & 1,2,3 John</option>
+            <option value="2027-2028">2027-2028 - Isaiah 34-66</option>
+          </select>
+        </fieldset>
+        <fieldset id="chapter-selector" style="display: none;">
+          <legend>Chapter selector</legend>
+          <label><input type="checkbox" id="select-all" /> Select all</label>
+          <div id="chapter-options"></div>
+        </fieldset>
+      </div>
     </div>
     <button type="button" id="start-button" disabled>Start</button>
+    <div id="question-area" class="question-card" style="display: none;">
+      <div class="question-header">
+        <p id="question-title">Question 1</p>
+      </div>
+      <div class="question-subline">
+        <span id="question-reference" class="question-reference"></span>
+      </div>
+      <p id="question-text" class="question-text"></p>
+      <div class="question-actions">
+        <button type="button" id="prev-button" disabled>Previous</button>
+        <button type="button" id="next-button">Next</button>
+      </div>
+    </div>
   </div>
   <script src="script.js"></script>
 </body>

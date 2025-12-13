@@ -103,12 +103,79 @@ button:disabled {
   background: rgba(255, 255, 255, 0.04);
 }
 
+.accordion-toggle {
+  width: 100%;
+  background: transparent;
+  color: #f5f7fb;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 700;
+  cursor: pointer;
+  margin-bottom: 12px;
+}
+
+.accordion-toggle:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.selectors.collapsed #selectors-content {
+  display: none;
+}
+
 .selectors fieldset {
   margin-bottom: 12px;
 }
 
 .selectors fieldset:last-of-type {
   margin-bottom: 0;
+}
+
+.question-card {
+  margin-top: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.question-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.question-subline {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  margin-top: 0;
+  margin-bottom: 6px;
+}
+
+.question-reference {
+  display: inline-block;
+  margin-top: 0;
+  font-weight: 600;
+  color: #d6e2f7;
+}
+
+.question-text {
+  margin: 8px 0 12px;
+  line-height: 1.6;
+  color: #f5f7fb;
+}
+
+.question-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.question-actions button {
+  flex: 1;
 }
 
 .chapter-status {

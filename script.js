@@ -3,6 +3,15 @@ const chapterSelector = document.getElementById('chapter-selector');
 const selectAll = document.getElementById('select-all');
 const optionsContainer = document.getElementById('chapter-options');
 const startButton = document.getElementById('start-button');
+const selectorsContainer = document.getElementById('selectors-container');
+const selectorsContent = document.getElementById('selectors-content');
+const selectorsToggle = document.getElementById('selectors-toggle');
+const questionArea = document.getElementById('question-area');
+const questionTitle = document.getElementById('question-title');
+const questionReference = document.getElementById('question-reference');
+const questionText = document.getElementById('question-text');
+const prevButton = document.getElementById('prev-button');
+const nextButton = document.getElementById('next-button');
 
 const STORAGE_KEY = 'pbeSettings';
 const STATE_VERSION = 1;
@@ -107,6 +116,9 @@ const defaultState = {
 let appState = { ...defaultState };
 let chapterOptions = [];
 const downloadsInFlight = new Map();
+let questionOrder = [];
+let questionIndex = 0;
+let sessionActive = false;
 
 const requestPersistentStorage = async () => {
   if (navigator.storage && navigator.storage.persist) {
@@ -198,6 +210,15 @@ const statusLabelFor = (status) => {
   return ' (not downloaded)';
 };
 
+const toggleSelectors = (forceState) => {
+  const shouldCollapse =
+    typeof forceState === 'boolean'
+      ? forceState
+      : selectorsContainer.classList.contains('collapsed') === false;
+  selectorsContainer.classList.toggle('collapsed', shouldCollapse);
+  selectorsToggle.textContent = shouldCollapse ? 'Settings ▸' : 'Settings ▾';
+};
+
 const updateChapterIndicators = () => {
   chapterOptions.forEach((option) => {
     const chapterKey = option.value;
@@ -231,9 +252,9 @@ const renderChapterOptions = (year, selectedValues = new Set()) => {
 
       const textNode = document.createTextNode(` ${meta.label} ${chapter}`);
       const statusSpan = document.createElement('span');
-    const status = appState.chapterIndex[chapterKey]?.status || STATUS.NOT_DOWNLOADED;
-    statusSpan.className = `chapter-status${status ? ` ${status}` : ''}`;
-    statusSpan.textContent = statusLabelFor(status);
+      const status = appState.chapterIndex[chapterKey]?.status || STATUS.NOT_DOWNLOADED;
+      statusSpan.className = `chapter-status${status ? ` ${status}` : ''}`;
+      statusSpan.textContent = statusLabelFor(status);
 
       label.appendChild(input);
       label.appendChild(textNode);
@@ -393,6 +414,12 @@ const handleChapterSelectionChange = () => {
   saveState();
   startDownloadsForSelection();
   updateStartState();
+  if (sessionActive) {
+    // Rebuild the question order if the selection changed while in session.
+    questionOrder = shuffle(appState.activeVerseIds);
+    questionIndex = 0;
+    updateQuestionView();
+  }
 };
 
 const handleSelectAllChange = (checked) => {
@@ -400,6 +427,66 @@ const handleSelectAllChange = (checked) => {
     option.checked = checked;
   });
   handleChapterSelectionChange();
+};
+
+const shuffle = (arr) => {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+};
+
+const verseReference = (verseId) => {
+  const [bookIdStr, chapterStr, verseStr] = verseId.split(',');
+  const bookId = Number(bookIdStr);
+  const chapter = Number(chapterStr);
+  const verse = Number(verseStr);
+  const bookLabel = Object.values(books).find((b) => b.id === bookId)?.label || `Book ${bookId}`;
+  return `${bookLabel} ${chapter}:${verse} (NKJV)`;
+};
+
+const updateQuestionView = () => {
+  if (!sessionActive || questionOrder.length === 0) {
+    questionArea.style.display = 'none';
+    return;
+  }
+  questionArea.style.display = 'block';
+  const verseId = questionOrder[questionIndex];
+  const verseData = appState.verseBank[verseId];
+  questionTitle.textContent = `Question ${questionIndex + 1}`;
+  questionReference.textContent = verseReference(verseId);
+  questionText.innerHTML = verseData ? verseData.text : '';
+  prevButton.disabled = questionIndex === 0;
+};
+
+const startSession = () => {
+  if (appState.activeVerseIds.length === 0) return;
+  sessionActive = true;
+  questionOrder = shuffle(appState.activeVerseIds);
+  questionIndex = 0;
+  toggleSelectors(true);
+  updateQuestionView();
+};
+
+const goNext = () => {
+  if (!sessionActive || questionOrder.length === 0) return;
+  if (questionIndex < questionOrder.length - 1) {
+    questionIndex += 1;
+  } else {
+    questionOrder = shuffle(appState.activeVerseIds);
+    questionIndex = 0;
+  }
+  updateQuestionView();
+};
+
+const goPrev = () => {
+  if (!sessionActive || questionOrder.length === 0) return;
+  if (questionIndex > 0) {
+    questionIndex -= 1;
+    updateQuestionView();
+  }
 };
 
 const toggleChapterSelector = () => {
@@ -431,6 +518,11 @@ seasonSelect.addEventListener('change', () => {
 selectAll.addEventListener('change', (event) => {
   handleSelectAllChange(event.target.checked);
 });
+
+startButton.addEventListener('click', startSession);
+selectorsToggle.addEventListener('click', () => toggleSelectors());
+nextButton.addEventListener('click', goNext);
+prevButton.addEventListener('click', goPrev);
 
 const initialState = loadState();
 if (initialState) {
