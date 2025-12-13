@@ -25,6 +25,7 @@ const STATUS = {
   ERROR: 'error',
   NOT_DOWNLOADED: 'not-downloaded',
 };
+const STATE_OF_BEING_WORDS = ['am', 'is', 'are', 'was', 'were', 'be', 'being', 'been'];
 
 const books = {
   genesis: { id: 1, totalChapters: 50, label: 'Genesis' },
@@ -126,6 +127,7 @@ let questionOrder = [];
 let questionIndex = 0;
 let sessionActive = false;
 let questionPointsList = [];
+let compromiseReady = false;
 
 const requestPersistentStorage = async () => {
   if (navigator.storage && navigator.storage.persist) {
@@ -192,6 +194,22 @@ const stripHtml = (html) => html.replace(/<[^>]*>/g, ' ');
 const toInt = (value, fallback = 1) => {
   const n = Math.floor(Number(value));
   return Number.isFinite(n) ? n : fallback;
+};
+
+const installCompromisePlugin = () => {
+  if (compromiseReady || typeof nlp === 'undefined') return;
+  nlp.plugin(() => ({
+    tags: {
+      StatesofBeingVerbs: {
+        isA: null, // do not inherit Verb so they are only in the custom category
+      },
+    },
+    words: STATE_OF_BEING_WORDS.reduce((acc, word) => {
+      acc[word] = 'StatesofBeingVerbs';
+      return acc;
+    }, {}),
+  }));
+  compromiseReady = true;
 };
 
 const computeMinWordsInActiveSelection = () => {
@@ -630,5 +648,6 @@ if (appState.year) {
   seasonSelect.value = appState.year;
 }
 
+installCompromisePlugin();
 toggleChapterSelector();
 requestPersistentStorage();
