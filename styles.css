@@ -132,6 +132,13 @@ button:disabled {
   margin-bottom: 0;
 }
 
+.hint {
+  font-size: 12px;
+  color: #d6e2f7;
+  opacity: 0.85;
+  margin-top: 4px;
+}
+
 .question-card {
   margin-top: 14px;
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -143,6 +150,7 @@ button:disabled {
 .question-header {
   display: flex;
   align-items: baseline;
+  justify-content: space-between;
   gap: 8px;
   margin-bottom: 2px;
 }
@@ -160,6 +168,12 @@ button:disabled {
   margin-top: 0;
   font-weight: 600;
   color: #d6e2f7;
+}
+
+.question-points {
+  font-weight: 700;
+  color: #fbd38d;
+  font-size: 14px;
 }
 
 .question-text {

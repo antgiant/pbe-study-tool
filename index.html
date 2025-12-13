@@ -28,12 +28,21 @@
           <label><input type="checkbox" id="select-all" /> Select all</label>
           <div id="chapter-options"></div>
         </fieldset>
+        <fieldset id="blank-selector">
+          <legend>Blanks</legend>
+          <label for="min-blanks">Min blanks</label>
+          <input type="number" id="min-blanks" name="min-blanks" min="1" value="1" step="1" inputmode="numeric" />
+          <label for="max-blanks">Max blanks</label>
+          <input type="number" id="max-blanks" name="max-blanks" min="1" value="1" step="1" inputmode="numeric" />
+          <div id="blank-limit" class="hint">Max allowed is 1 based on selected verses.</div>
+        </fieldset>
       </div>
     </div>
     <button type="button" id="start-button" disabled>Start</button>
     <div id="question-area" class="question-card" style="display: none;">
       <div class="question-header">
         <p id="question-title">Question 1</p>
+        <span id="question-points" class="question-points"></span>
       </div>
       <div class="question-subline">
         <span id="question-reference" class="question-reference"></span>

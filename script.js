@@ -10,8 +10,12 @@ const questionArea = document.getElementById('question-area');
 const questionTitle = document.getElementById('question-title');
 const questionReference = document.getElementById('question-reference');
 const questionText = document.getElementById('question-text');
+const questionPointsEl = document.getElementById('question-points');
 const prevButton = document.getElementById('prev-button');
 const nextButton = document.getElementById('next-button');
+const minBlanksInput = document.getElementById('min-blanks');
+const maxBlanksInput = document.getElementById('max-blanks');
+const blankLimitHint = document.getElementById('blank-limit');
 
 const STORAGE_KEY = 'pbeSettings';
 const STATE_VERSION = 1;
@@ -111,6 +115,8 @@ const defaultState = {
   activeVerseIds: [],
   chapterIndex: {},
   verseBank: {},
+  minBlanks: 1,
+  maxBlanks: 1,
 };
 
 let appState = { ...defaultState };
@@ -119,6 +125,7 @@ const downloadsInFlight = new Map();
 let questionOrder = [];
 let questionIndex = 0;
 let sessionActive = false;
+let questionPointsList = [];
 
 const requestPersistentStorage = async () => {
   if (navigator.storage && navigator.storage.persist) {
@@ -180,8 +187,49 @@ const recomputeActiveVerseIds = () => {
   appState.activeVerseIds = ids;
 };
 
+const stripHtml = (html) => html.replace(/<[^>]*>/g, ' ');
+
+const toInt = (value, fallback = 1) => {
+  const n = Math.floor(Number(value));
+  return Number.isFinite(n) ? n : fallback;
+};
+
+const computeMaxWordsInActiveSelection = () => {
+  let maxWords = 1;
+  appState.activeVerseIds.forEach((id) => {
+    const verse = appState.verseBank[id];
+    if (!verse || !verse.text) return;
+    const plain = stripHtml(verse.text).trim();
+    if (!plain) return;
+    const words = plain.split(/\s+/).filter(Boolean).length;
+    if (words > maxWords) maxWords = words;
+  });
+  return maxWords;
+};
+
+const updateBlankInputs = () => {
+  const maxWords = computeMaxWordsInActiveSelection();
+  const minVal = Math.max(1, toInt(appState.minBlanks, 1));
+  const maxVal = Math.max(minVal, Math.min(toInt(appState.maxBlanks, maxWords), maxWords));
+
+  appState.minBlanks = minVal;
+  appState.maxBlanks = maxVal;
+
+  minBlanksInput.min = 1;
+  minBlanksInput.max = maxWords;
+  maxBlanksInput.min = 1;
+  maxBlanksInput.max = maxWords;
+
+  minBlanksInput.value = appState.minBlanks;
+  maxBlanksInput.value = appState.maxBlanks;
+
+  blankLimitHint.textContent = `Max allowed is ${maxWords} based on selected verses.`;
+  saveState();
+};
+
 const updateStartState = () => {
   recomputeActiveVerseIds();
+  updateBlankInputs();
   const anySelected = appState.activeChapters.length > 0;
   const anyDownloads = downloadsInFlight.size > 0;
   const allReady =
@@ -417,6 +465,7 @@ const handleChapterSelectionChange = () => {
   if (sessionActive) {
     // Rebuild the question order if the selection changed while in session.
     questionOrder = shuffle(appState.activeVerseIds);
+    questionPointsList = questionOrder.map(() => randomPointsValue());
     questionIndex = 0;
     updateQuestionView();
   }
@@ -447,6 +496,9 @@ const verseReference = (verseId) => {
   return `${bookLabel} ${chapter}:${verse} (NKJV)`;
 };
 
+const randomPointsValue = () =>
+  Math.floor(Math.random() * (appState.maxBlanks - appState.minBlanks + 1)) + appState.minBlanks;
+
 const updateQuestionView = () => {
   if (!sessionActive || questionOrder.length === 0) {
     questionArea.style.display = 'none';
@@ -458,6 +510,9 @@ const updateQuestionView = () => {
   questionTitle.textContent = `Question ${questionIndex + 1}`;
   questionReference.textContent = verseReference(verseId);
   questionText.innerHTML = verseData ? verseData.text : '';
+  const pointsValue =
+    questionPointsList[questionIndex] ?? (questionPointsList[questionIndex] = randomPointsValue());
+  questionPointsEl.textContent = `${pointsValue} Points`;
   prevButton.disabled = questionIndex === 0;
 };
 
@@ -465,6 +520,7 @@ const startSession = () => {
   if (appState.activeVerseIds.length === 0) return;
   sessionActive = true;
   questionOrder = shuffle(appState.activeVerseIds);
+  questionPointsList = questionOrder.map(() => randomPointsValue());
   questionIndex = 0;
   toggleSelectors(true);
   updateQuestionView();
@@ -476,6 +532,7 @@ const goNext = () => {
     questionIndex += 1;
   } else {
     questionOrder = shuffle(appState.activeVerseIds);
+    questionPointsList = questionOrder.map(() => randomPointsValue());
     questionIndex = 0;
   }
   updateQuestionView();
@@ -493,6 +550,8 @@ const toggleChapterSelector = () => {
   const hasSelection = seasonSelect.value.trim().length > 0;
   const fieldsetDisplay = hasSelection ? 'block' : 'none';
   chapterSelector.style.display = fieldsetDisplay;
+  const blanksDisplay = hasSelection ? 'block' : 'none';
+  document.getElementById('blank-selector').style.display = blanksDisplay;
   startButton.style.display = hasSelection ? 'inline-flex' : 'none';
 
   if (!hasSelection) {
@@ -523,6 +582,25 @@ startButton.addEventListener('click', startSession);
 selectorsToggle.addEventListener('click', () => toggleSelectors());
 nextButton.addEventListener('click', goNext);
 prevButton.addEventListener('click', goPrev);
+
+minBlanksInput.addEventListener('input', () => {
+  const value = Math.max(1, toInt(minBlanksInput.value, 1));
+  appState.minBlanks = value;
+  if (appState.maxBlanks < value) {
+    appState.maxBlanks = value;
+  }
+  updateBlankInputs();
+});
+
+maxBlanksInput.addEventListener('input', () => {
+  const value = Math.max(1, toInt(maxBlanksInput.value, 1));
+  const maxWords = computeMaxWordsInActiveSelection();
+  appState.maxBlanks = Math.min(value, maxWords);
+  if (appState.maxBlanks < appState.minBlanks) {
+    appState.minBlanks = appState.maxBlanks;
+  }
+  updateBlankInputs();
+});
 
 const initialState = loadState();
 if (initialState) {
