@@ -4,6 +4,8 @@ const selectAll = document.getElementById('select-all');
 const optionsContainer = document.getElementById('chapter-options');
 const startButton = document.getElementById('start-button');
 
+const STORAGE_KEY = 'pbeSettings';
+
 const books = {
   genesis: { id: 1, totalChapters: 50, label: 'Genesis' },
   exodus: { id: 2, totalChapters: 40, label: 'Exodus' },
@@ -88,6 +90,28 @@ const chaptersByYear = {
 
 let chapterOptions = [];
 
+const loadState = () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (err) {
+    console.warn('Unable to load saved settings', err);
+    return null;
+  }
+};
+
+const saveState = () => {
+  const payload = {
+    year: seasonSelect.value || '',
+    chapters: chapterOptions.filter((option) => option.checked).map((option) => option.value),
+  };
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  } catch (err) {
+    console.warn('Unable to save settings', err);
+  }
+};
+
 const updateChapterSelectionState = () => {
   const hasSelection = chapterOptions.some((option) => option.checked);
   startButton.disabled = !hasSelection;
@@ -102,7 +126,7 @@ const syncSelectAllState = () => {
   selectAll.checked = allChecked;
 };
 
-const renderChapterOptions = (year) => {
+const renderChapterOptions = (year, selectedValues = new Set()) => {
   optionsContainer.innerHTML = '';
   const selections = chaptersByYear[year] || [];
 
@@ -117,6 +141,7 @@ const renderChapterOptions = (year) => {
       input.type = 'checkbox';
       input.className = 'chapter-option';
       input.value = `${meta.id},${chapter}`;
+      input.checked = selectedValues.has(input.value);
       label.appendChild(input);
       label.append(` ${meta.label} ${chapter}`);
       optionsContainer.appendChild(label);
@@ -128,6 +153,7 @@ const renderChapterOptions = (year) => {
     option.addEventListener('change', () => {
       syncSelectAllState();
       updateChapterSelectionState();
+      saveState();
     });
   });
 
@@ -143,15 +169,23 @@ const toggleChapterSelector = () => {
 
   if (!hasSelection) {
     selectAll.checked = false;
-    renderChapterOptions(null);
+    renderChapterOptions(null, new Set());
     startButton.disabled = true;
     updateChapterSelectionState();
   } else {
-    renderChapterOptions(seasonSelect.value);
+    const stored = loadState();
+    const selectedValues =
+      stored && stored.year === seasonSelect.value
+        ? new Set(stored.chapters || [])
+        : new Set();
+    renderChapterOptions(seasonSelect.value, selectedValues);
   }
+  saveState();
 };
 
-seasonSelect.addEventListener('change', toggleChapterSelector);
+seasonSelect.addEventListener('change', () => {
+  toggleChapterSelector();
+});
 
 selectAll.addEventListener('change', (event) => {
   const checked = event.target.checked;
@@ -159,6 +193,12 @@ selectAll.addEventListener('change', (event) => {
     option.checked = checked;
   });
   updateChapterSelectionState();
+  saveState();
 });
+
+const initialState = loadState();
+if (initialState?.year) {
+  seasonSelect.value = initialState.year;
+}
 
 toggleChapterSelector();
