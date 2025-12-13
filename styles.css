@@ -95,6 +95,22 @@ button:disabled {
   margin: 12px auto 0;
 }
 
+.selectors {
+  margin-top: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 14px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.selectors fieldset {
+  margin-bottom: 12px;
+}
+
+.selectors fieldset:last-of-type {
+  margin-bottom: 0;
+}
+
 .chapter-status {
   margin-left: 6px;
   font-size: 12px;
