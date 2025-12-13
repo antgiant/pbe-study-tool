@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PBE Practice Engine</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="card">
+    <h1>PBE Practice Engine</h1>
+    <p>A tool to help you learn PBE verses by practicing fill in the blank questions.</p>
+    <h2>Please select the year you wish to study for</h2>
+    <label for="year">Year</label>
+    <select id="year" name="year">
+      <option value=""></option>
+      <option value="2025-2026">2025-2026 - Isaiah 1-33</option>
+      <option value="2026-2027">2026-2027 - Mark, 1,2 Peter, & 1,2,3 John</option>
+      <option value="2027-2028">2027-2028 - Isaiah 34-66</option>
+    </select>
+    <fieldset id="chapter-selector" style="display: none;">
+      <legend>Chapter selecter</legend>
+      <label><input type="checkbox" id="select-all" /> Select all</label>
+      <label><input type="checkbox" class="chapter-option" value="sample-1" /> Sample Value 1</label>
+      <label><input type="checkbox" class="chapter-option" value="sample-2" /> Sample Value 2</label>
+      <label><input type="checkbox" class="chapter-option" value="sample-3" /> Sample Value 3</label>
+    </fieldset>
+    <button type="button" id="start-button" disabled>Start</button>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>
