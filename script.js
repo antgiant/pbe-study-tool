@@ -5,6 +5,13 @@ const optionsContainer = document.getElementById('chapter-options');
 const startButton = document.getElementById('start-button');
 
 const STORAGE_KEY = 'pbeSettings';
+const STATE_VERSION = 1;
+const STATUS = {
+  READY: 'ready',
+  DOWNLOADING: 'downloading',
+  ERROR: 'error',
+  NOT_DOWNLOADED: 'not-downloaded',
+};
 
 const books = {
   genesis: { id: 1, totalChapters: 50, label: 'Genesis' },
@@ -88,12 +95,54 @@ const chaptersByYear = {
   '2027-2028': [{ bookKey: 'isaiah', start: 34, end: 66 }],
 };
 
+const defaultState = {
+  version: STATE_VERSION,
+  year: '',
+  activeChapters: [],
+  activeVerseIds: [],
+  chapterIndex: {},
+  verseBank: {},
+};
+
+let appState = { ...defaultState };
 let chapterOptions = [];
+const downloadsInFlight = new Map();
+
+const requestPersistentStorage = async () => {
+  if (navigator.storage && navigator.storage.persist) {
+    try {
+      await navigator.storage.persist();
+    } catch (err) {
+      console.warn('Persistent storage request failed', err);
+    }
+  }
+};
 
 const loadState = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed.version === STATE_VERSION) {
+      const normalized = { ...defaultState, ...parsed };
+      // Clear transient/error statuses on load so retry indicators do not persist.
+      Object.entries(normalized.chapterIndex || {}).forEach(([key, entry]) => {
+        if (!entry) return;
+        if (entry.status === STATUS.ERROR || entry.status === STATUS.DOWNLOADING) {
+          entry.status = undefined;
+        }
+      });
+      return normalized;
+    }
+    // Backward compatibility with the earlier shape.
+    if (parsed.year || parsed.chapters) {
+      return {
+        ...defaultState,
+        year: parsed.year || '',
+        activeChapters: parsed.chapters || [],
+      };
+    }
+    return null;
   } catch (err) {
     console.warn('Unable to load saved settings', err);
     return null;
@@ -101,20 +150,36 @@ const loadState = () => {
 };
 
 const saveState = () => {
-  const payload = {
-    year: seasonSelect.value || '',
-    chapters: chapterOptions.filter((option) => option.checked).map((option) => option.value),
-  };
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
   } catch (err) {
     console.warn('Unable to save settings', err);
   }
 };
 
-const updateChapterSelectionState = () => {
-  const hasSelection = chapterOptions.some((option) => option.checked);
-  startButton.disabled = !hasSelection;
+const recomputeActiveVerseIds = () => {
+  const ids = [];
+  appState.activeChapters.forEach((chapterKey) => {
+    const entry = appState.chapterIndex[chapterKey];
+    if (entry && entry.status === STATUS.READY && entry.verseIds?.length) {
+      ids.push(...entry.verseIds);
+    }
+  });
+  appState.activeVerseIds = ids;
+};
+
+const updateStartState = () => {
+  recomputeActiveVerseIds();
+  const anySelected = appState.activeChapters.length > 0;
+  const anyDownloads = downloadsInFlight.size > 0;
+  const allReady =
+    appState.activeChapters.length > 0 &&
+    appState.activeChapters.every((chapterKey) => {
+      const entry = appState.chapterIndex[chapterKey];
+      return entry && entry.status === STATUS.READY && entry.verseIds && entry.verseIds.length > 0;
+    });
+  const hasVerses = appState.activeVerseIds.length > 0;
+  startButton.disabled = !anySelected || anyDownloads || !allReady || !hasVerses;
 };
 
 const syncSelectAllState = () => {
@@ -124,6 +189,26 @@ const syncSelectAllState = () => {
   }
   const allChecked = chapterOptions.every((option) => option.checked);
   selectAll.checked = allChecked;
+};
+
+const statusLabelFor = (status) => {
+  if (status === STATUS.DOWNLOADING) return ' (downloading...)';
+  if (status === STATUS.ERROR) return ' ⚠ retry needed';
+  if (status === STATUS.READY) return ' (ready)';
+  return ' (not downloaded)';
+};
+
+const updateChapterIndicators = () => {
+  chapterOptions.forEach((option) => {
+    const chapterKey = option.value;
+    const entry = appState.chapterIndex[chapterKey];
+    const status = entry?.status || STATUS.NOT_DOWNLOADED;
+    const indicator = option.parentElement.querySelector('.chapter-status');
+    if (indicator) {
+      indicator.textContent = statusLabelFor(status);
+      indicator.className = `chapter-status${status ? ` ${status}` : ''}`;
+    }
+  });
 };
 
 const renderChapterOptions = (year, selectedValues = new Set()) => {
@@ -136,14 +221,23 @@ const renderChapterOptions = (year, selectedValues = new Set()) => {
     const cappedEnd = Math.min(end, meta.totalChapters);
 
     for (let chapter = start; chapter <= cappedEnd; chapter += 1) {
+      const chapterKey = `${meta.id},${chapter}`;
       const label = document.createElement('label');
       const input = document.createElement('input');
       input.type = 'checkbox';
       input.className = 'chapter-option';
-      input.value = `${meta.id},${chapter}`;
+      input.value = chapterKey;
       input.checked = selectedValues.has(input.value);
+
+      const textNode = document.createTextNode(` ${meta.label} ${chapter}`);
+      const statusSpan = document.createElement('span');
+    const status = appState.chapterIndex[chapterKey]?.status || STATUS.NOT_DOWNLOADED;
+    statusSpan.className = `chapter-status${status ? ` ${status}` : ''}`;
+    statusSpan.textContent = statusLabelFor(status);
+
       label.appendChild(input);
-      label.append(` ${meta.label} ${chapter}`);
+      label.appendChild(textNode);
+      label.appendChild(statusSpan);
       optionsContainer.appendChild(label);
     }
   });
@@ -152,13 +246,160 @@ const renderChapterOptions = (year, selectedValues = new Set()) => {
   chapterOptions.forEach((option) => {
     option.addEventListener('change', () => {
       syncSelectAllState();
-      updateChapterSelectionState();
-      saveState();
+      handleChapterSelectionChange();
     });
   });
 
   syncSelectAllState();
-  updateChapterSelectionState();
+  updateChapterIndicators();
+  updateStartState();
+};
+
+const getChapterMeta = (chapterKey) => {
+  const [bookIdStr, chapterStr] = chapterKey.split(',');
+  const bookId = Number(bookIdStr);
+  const chapter = Number(chapterStr);
+  return { bookId, chapter };
+};
+
+const storeChapterData = (chapterKey, verses, source) => {
+  const verseIds = [];
+  verses.forEach(({ verse, text }) => {
+    const id = `${chapterKey},${verse}`;
+    verseIds.push(id);
+    const { bookId, chapter } = getChapterMeta(chapterKey);
+    appState.verseBank[id] = { bookId, chapter, verse, text, source };
+  });
+  appState.chapterIndex[chapterKey] = {
+    verseIds,
+    lastUpdated: new Date().toISOString(),
+    status: STATUS.READY,
+  };
+};
+
+const parseVerses = (data) => {
+  if (!data) return [];
+  if (Array.isArray(data)) {
+    return data
+      .map((entry) => ({
+        verse: Number(entry.verse || entry.verse_nr || entry.nr),
+        text: entry.text || entry.text_nr || entry.text_clean || entry.content || '',
+      }))
+      .filter((v) => Number.isFinite(v.verse) && v.text);
+  }
+  if (Array.isArray(data.verses)) {
+    return data.verses
+      .map((entry) => ({
+        verse: Number(entry.verse || entry.verse_nr || entry.nr),
+        text: entry.text || entry.text_nr || entry.text_clean || entry.content || '',
+      }))
+      .filter((v) => Number.isFinite(v.verse) && v.text);
+  }
+  if (data.verses && typeof data.verses === 'object') {
+    return Object.entries(data.verses)
+      .map(([k, v]) => ({
+        verse: Number(k),
+        text: typeof v === 'string' ? v : v.text || '',
+      }))
+      .filter((v) => Number.isFinite(v.verse) && v.text);
+  }
+  return [];
+};
+
+const markChapterStatus = (chapterKey, status) => {
+  if (!appState.chapterIndex[chapterKey]) {
+    appState.chapterIndex[chapterKey] = { verseIds: [], lastUpdated: null, status };
+  } else {
+    appState.chapterIndex[chapterKey].status = status;
+  }
+  updateChapterIndicators();
+  updateStartState();
+  saveState();
+};
+
+const uncheckChapter = (chapterKey) => {
+  chapterOptions.forEach((option) => {
+    if (option.value === chapterKey) {
+      option.checked = false;
+    }
+  });
+  appState.activeChapters = appState.activeChapters.filter((key) => key !== chapterKey);
+  syncSelectAllState();
+};
+
+const fetchChapter = async (chapterKey) => {
+  const { bookId, chapter } = getChapterMeta(chapterKey);
+  const url = `https://bolls.life/get-text/NKJV/${bookId}/${chapter}/`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ${chapterKey}: ${response.status}`);
+  }
+  return response.json();
+};
+
+const downloadChapterIfNeeded = (chapterKey) => {
+  const existing = appState.chapterIndex[chapterKey];
+  if (existing && existing.status === STATUS.READY && existing.verseIds?.length) {
+    return Promise.resolve();
+  }
+
+  if (downloadsInFlight.has(chapterKey)) {
+    return downloadsInFlight.get(chapterKey);
+  }
+
+  markChapterStatus(chapterKey, STATUS.DOWNLOADING);
+
+  const downloadPromise = fetchChapter(chapterKey)
+    .then((data) => {
+      const verses = parseVerses(data);
+      if (!verses.length) {
+        throw new Error(`No verses found for ${chapterKey}`);
+      }
+      storeChapterData(chapterKey, verses, 'NKJV');
+      markChapterStatus(chapterKey, STATUS.READY);
+      recomputeActiveVerseIds();
+      saveState();
+      updateStartState();
+    })
+    .catch((err) => {
+      console.warn(err);
+      markChapterStatus(chapterKey, STATUS.ERROR);
+      uncheckChapter(chapterKey);
+      handleChapterSelectionChange();
+    })
+    .finally(() => {
+      downloadsInFlight.delete(chapterKey);
+      updateStartState();
+      updateChapterIndicators();
+    });
+
+  downloadsInFlight.set(chapterKey, downloadPromise);
+  updateStartState();
+  return downloadPromise;
+};
+
+const startDownloadsForSelection = () => {
+  const needed = appState.activeChapters.filter((chapterKey) => {
+    const entry = appState.chapterIndex[chapterKey];
+    return !(entry && entry.status === STATUS.READY && entry.verseIds?.length);
+  });
+  needed.forEach((chapterKey) => {
+    downloadChapterIfNeeded(chapterKey);
+  });
+};
+
+const handleChapterSelectionChange = () => {
+  appState.activeChapters = chapterOptions.filter((option) => option.checked).map((opt) => opt.value);
+  saveState();
+  startDownloadsForSelection();
+  updateStartState();
+};
+
+const handleSelectAllChange = (checked) => {
+  chapterOptions.forEach((option) => {
+    option.checked = checked;
+  });
+  handleChapterSelectionChange();
 };
 
 const toggleChapterSelector = () => {
@@ -171,16 +412,16 @@ const toggleChapterSelector = () => {
     selectAll.checked = false;
     renderChapterOptions(null, new Set());
     startButton.disabled = true;
-    updateChapterSelectionState();
-  } else {
-    const stored = loadState();
-    const selectedValues =
-      stored && stored.year === seasonSelect.value
-        ? new Set(stored.chapters || [])
-        : new Set();
-    renderChapterOptions(seasonSelect.value, selectedValues);
+    appState = { ...defaultState };
+    saveState();
+    updateChapterIndicators();
+    return;
   }
-  saveState();
+
+  appState.year = seasonSelect.value;
+  const selectedValues = new Set(appState.activeChapters || []);
+  renderChapterOptions(seasonSelect.value, selectedValues);
+  handleChapterSelectionChange();
 };
 
 seasonSelect.addEventListener('change', () => {
@@ -188,17 +429,16 @@ seasonSelect.addEventListener('change', () => {
 });
 
 selectAll.addEventListener('change', (event) => {
-  const checked = event.target.checked;
-  chapterOptions.forEach((option) => {
-    option.checked = checked;
-  });
-  updateChapterSelectionState();
-  saveState();
+  handleSelectAllChange(event.target.checked);
 });
 
 const initialState = loadState();
-if (initialState?.year) {
-  seasonSelect.value = initialState.year;
+if (initialState) {
+  appState = initialState;
+}
+if (appState.year) {
+  seasonSelect.value = appState.year;
 }
 
 toggleChapterSelector();
+requestPersistentStorage();

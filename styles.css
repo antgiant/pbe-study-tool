@@ -94,3 +94,26 @@ button:disabled {
   justify-content: center;
   margin: 12px auto 0;
 }
+
+.chapter-status {
+  margin-left: 6px;
+  font-size: 12px;
+  color: #d6e2f7;
+  opacity: 0.85;
+}
+
+.chapter-status.ready {
+  color: #bbf7d0;
+}
+
+.chapter-status.downloading {
+  color: #fbd38d;
+}
+
+.chapter-status.error {
+  color: #f87171;
+}
+
+.chapter-status.not-downloaded {
+  color: #d6e2f7;
+}
