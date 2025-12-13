@@ -194,6 +194,19 @@ const toInt = (value, fallback = 1) => {
   return Number.isFinite(n) ? n : fallback;
 };
 
+const computeMinWordsInActiveSelection = () => {
+  let minWords = Infinity;
+  appState.activeVerseIds.forEach((id) => {
+    const verse = appState.verseBank[id];
+    if (!verse || !verse.text) return;
+    const plain = stripHtml(verse.text).trim();
+    if (!plain) return;
+    const words = plain.split(/\s+/).filter(Boolean).length;
+    if (words < minWords) minWords = words;
+  });
+  return Number.isFinite(minWords) ? minWords : 1;
+};
+
 const computeMaxWordsInActiveSelection = () => {
   let maxWords = 1;
   appState.activeVerseIds.forEach((id) => {
@@ -208,22 +221,23 @@ const computeMaxWordsInActiveSelection = () => {
 };
 
 const updateBlankInputs = () => {
+  const minWords = computeMinWordsInActiveSelection();
   const maxWords = computeMaxWordsInActiveSelection();
-  const minVal = Math.max(1, toInt(appState.minBlanks, 1));
+  const minVal = Math.max(1, Math.min(toInt(appState.minBlanks, 1), minWords));
   const maxVal = Math.max(minVal, Math.min(toInt(appState.maxBlanks, maxWords), maxWords));
 
   appState.minBlanks = minVal;
   appState.maxBlanks = maxVal;
 
   minBlanksInput.min = 1;
-  minBlanksInput.max = maxWords;
+  minBlanksInput.max = minWords;
   maxBlanksInput.min = 1;
   maxBlanksInput.max = maxWords;
 
   minBlanksInput.value = appState.minBlanks;
   maxBlanksInput.value = appState.maxBlanks;
 
-  blankLimitHint.textContent = `Max allowed is ${maxWords} based on selected verses.`;
+  blankLimitHint.textContent = `Min capped at ${minWords} words; max allowed is ${maxWords} based on selected verses.`;
   saveState();
 };
 
@@ -465,7 +479,7 @@ const handleChapterSelectionChange = () => {
   if (sessionActive) {
     // Rebuild the question order if the selection changed while in session.
     questionOrder = shuffle(appState.activeVerseIds);
-    questionPointsList = questionOrder.map(() => randomPointsValue());
+    questionPointsList = questionOrder.map((id) => randomPointsValue(id));
     questionIndex = 0;
     updateQuestionView();
   }
@@ -496,8 +510,14 @@ const verseReference = (verseId) => {
   return `${bookLabel} ${chapter}:${verse} (NKJV)`;
 };
 
-const randomPointsValue = () =>
-  Math.floor(Math.random() * (appState.maxBlanks - appState.minBlanks + 1)) + appState.minBlanks;
+const randomPointsValue = (verseId) => {
+  const verse = appState.verseBank[verseId];
+  const plain = verse?.text ? stripHtml(verse.text).trim() : '';
+  const wordCount = plain ? plain.split(/\s+/).filter(Boolean).length : 1;
+  const maxAllowed = Math.min(appState.maxBlanks, wordCount);
+  const minAllowed = Math.min(appState.minBlanks, maxAllowed);
+  return Math.floor(Math.random() * (maxAllowed - minAllowed + 1)) + minAllowed;
+};
 
 const updateQuestionView = () => {
   if (!sessionActive || questionOrder.length === 0) {
@@ -511,7 +531,7 @@ const updateQuestionView = () => {
   questionReference.textContent = verseReference(verseId);
   questionText.innerHTML = verseData ? verseData.text : '';
   const pointsValue =
-    questionPointsList[questionIndex] ?? (questionPointsList[questionIndex] = randomPointsValue());
+    questionPointsList[questionIndex] ?? (questionPointsList[questionIndex] = randomPointsValue(verseId));
   questionPointsEl.textContent = `${pointsValue} Points`;
   prevButton.disabled = questionIndex === 0;
 };
@@ -520,7 +540,7 @@ const startSession = () => {
   if (appState.activeVerseIds.length === 0) return;
   sessionActive = true;
   questionOrder = shuffle(appState.activeVerseIds);
-  questionPointsList = questionOrder.map(() => randomPointsValue());
+  questionPointsList = questionOrder.map((id) => randomPointsValue(id));
   questionIndex = 0;
   toggleSelectors(true);
   updateQuestionView();
@@ -532,7 +552,7 @@ const goNext = () => {
     questionIndex += 1;
   } else {
     questionOrder = shuffle(appState.activeVerseIds);
-    questionPointsList = questionOrder.map(() => randomPointsValue());
+    questionPointsList = questionOrder.map((id) => randomPointsValue(id));
     questionIndex = 0;
   }
   updateQuestionView();
