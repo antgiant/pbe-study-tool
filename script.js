@@ -761,7 +761,10 @@ const toggleChapterSelector = () => {
     selectAll.checked = false;
     renderChapterOptions(null, new Set());
     startButton.disabled = true;
-    appState = { ...defaultState };
+    // Clear active selections but preserve downloaded data
+    appState.year = '';
+    appState.activeChapters = [];
+    appState.activeVerseIds = [];
     saveState();
     updateChapterIndicators();
     return;
