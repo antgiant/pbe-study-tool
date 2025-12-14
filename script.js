@@ -679,10 +679,11 @@ const handleChapterSelectionChange = () => {
 
     // Rebuild the question order if the selection changed while in session.
     questionOrder = shuffle(appState.activeVerseIds);
-    questionPointsList = questionOrder.map((id) => randomPointsValue(id));
+    const seedPoints = questionOrder.map((id) => randomPointsValue(id));
     const blanksData = questionOrder.map((id, idx) =>
-      applyBlanks(appState.verseBank[id]?.text || '', questionPointsList[idx], id)
+      applyBlanks(appState.verseBank[id]?.text || '', seedPoints[idx], id)
     );
+    questionPointsList = blanksData.map((data) => data.blankedWords.length);
     questionBlanksList = blanksData.map(data => data.blanked);
     questionAnswersList = blanksData.map(data => data.answer);
     questionBlankedWordsList = blanksData.map(data => data.blankedWords);
@@ -1076,16 +1077,19 @@ const updateQuestionView = () => {
   const verseData = appState.verseBank[verseId];
   questionTitle.textContent = `Question ${questionIndex + 1}`;
   questionReference.textContent = verseReference(verseId);
-  const pointsValue =
+  let pointsValue =
     questionPointsList[questionIndex] ?? (questionPointsList[questionIndex] = randomPointsValue(verseId));
-  questionPointsEl.textContent = `${pointsValue} Points`;
   if (!questionBlanksList[questionIndex]) {
     const blanksData = applyBlanks(verseData?.text || '', pointsValue, verseId);
     questionBlanksList[questionIndex] = blanksData.blanked;
     questionAnswersList[questionIndex] = blanksData.answer;
     questionBlankedWordsList[questionIndex] = blanksData.blankedWords;
+    // Sync points to actual blank count
+    pointsValue = blanksData.blankedWords.length;
+    questionPointsList[questionIndex] = pointsValue;
     hintsRevealedList[questionIndex] = 0;
   }
+  questionPointsEl.textContent = `${questionPointsList[questionIndex]} Points`;
 
   // Apply hints if any have been revealed
   const hintsRevealed = hintsRevealedList[questionIndex] || 0;
@@ -1119,10 +1123,11 @@ const startSession = () => {
   calculateSessionTFIDF();
 
   questionOrder = shuffle(appState.activeVerseIds);
-  questionPointsList = questionOrder.map((id) => randomPointsValue(id));
+  const seedPoints = questionOrder.map((id) => randomPointsValue(id));
   const blanksData = questionOrder.map((id, idx) =>
-    applyBlanks(appState.verseBank[id]?.text || '', questionPointsList[idx], id)
+    applyBlanks(appState.verseBank[id]?.text || '', seedPoints[idx], id)
   );
+  questionPointsList = blanksData.map((data) => data.blankedWords.length);
   questionBlanksList = blanksData.map(data => data.blanked);
   questionAnswersList = blanksData.map(data => data.answer);
   questionBlankedWordsList = blanksData.map(data => data.blankedWords);
@@ -1155,8 +1160,9 @@ const goNext = () => {
     questionIndex += 1;
   } else {
     questionOrder = shuffle(appState.activeVerseIds);
-    questionPointsList = questionOrder.map((id) => randomPointsValue(id));
-    const blanksData = questionOrder.map((id, idx) => applyBlanks(appState.verseBank[id]?.text || '', questionPointsList[idx], id));
+    const seedPoints = questionOrder.map((id) => randomPointsValue(id));
+    const blanksData = questionOrder.map((id, idx) => applyBlanks(appState.verseBank[id]?.text || '', seedPoints[idx], id));
+    questionPointsList = blanksData.map((data) => data.blankedWords.length);
     questionBlanksList = blanksData.map(data => data.blanked);
     questionAnswersList = blanksData.map(data => data.answer);
     questionBlankedWordsList = blanksData.map(data => data.blankedWords);
@@ -1182,8 +1188,9 @@ const goNextFromAnswer = () => {
     questionIndex += 1;
   } else {
     questionOrder = shuffle(appState.activeVerseIds);
-    questionPointsList = questionOrder.map((id) => randomPointsValue(id));
-    const blanksData = questionOrder.map((id, idx) => applyBlanks(appState.verseBank[id]?.text || '', questionPointsList[idx], id));
+    const seedPoints = questionOrder.map((id) => randomPointsValue(id));
+    const blanksData = questionOrder.map((id, idx) => applyBlanks(appState.verseBank[id]?.text || '', seedPoints[idx], id));
+    questionPointsList = blanksData.map((data) => data.blankedWords.length);
     questionBlanksList = blanksData.map(data => data.blanked);
     questionAnswersList = blanksData.map(data => data.answer);
     questionBlankedWordsList = blanksData.map(data => data.blankedWords);
