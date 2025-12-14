@@ -357,23 +357,22 @@ const computeMaxWordsInActiveSelection = () => {
 };
 
 const updateBlankInputs = () => {
-  const minWords = computeMinWordsInActiveSelection();
   const maxWords = computeMaxWordsInActiveSelection();
-  const minVal = Math.max(1, Math.min(toInt(appState.minBlanks, 1), minWords));
-  const maxVal = Math.max(minVal, Math.min(toInt(appState.maxBlanks, maxWords), maxWords));
+  const maxVal = Math.max(1, Math.min(toInt(appState.maxBlanks, maxWords), maxWords));
+  const minVal = Math.max(1, Math.min(toInt(appState.minBlanks, 1), maxVal));
 
   appState.minBlanks = minVal;
   appState.maxBlanks = maxVal;
 
   minBlanksInput.min = 1;
-  minBlanksInput.max = minWords;
+  minBlanksInput.max = maxVal;
   maxBlanksInput.min = 1;
   maxBlanksInput.max = maxWords;
 
   minBlanksInput.value = appState.minBlanks;
   maxBlanksInput.value = appState.maxBlanks;
 
-  blankLimitHint.textContent = `Min capped at ${minWords} words; max allowed is ${maxWords} based on selected verses.`;
+  blankLimitHint.textContent = `Min can go up to current max (${maxVal}); max allowed is ${maxWords} based on selected verses.`;
   saveState();
 };
 
@@ -885,6 +884,10 @@ const applyBlanks = (htmlText, blanks, verseId) => {
 
   // Parse plain text with NLP, but keep track of original HTML
   const plainText = stripHtml(raw);
+  const wordCount = plainText ? plainText.split(/\s+/).filter(Boolean).length : 0;
+  // Never request more blanks than there are words in the verse
+  const blanksRequested = Math.max(0, blanks);
+  const maxBlanksAllowed = Math.max(0, Math.min(blanksRequested, wordCount));
   const normalizedText = normalizeTextForNlp(plainText);
   const doc = typeof nlp !== 'undefined' ? nlp(normalizedText) : null;
   const termJson =
@@ -981,7 +984,7 @@ const applyBlanks = (htmlText, blanks, verseId) => {
 
   // Select top N candidates
   const chosen = new Set();
-  const target = Math.min(blanks, candidates.length);
+  const target = Math.min(maxBlanksAllowed, candidates.length);
   sortedCandidates.slice(0, target).forEach((c) => chosen.add(c.idx));
 
   // Build a set of plain text words to blank
