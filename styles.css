@@ -149,10 +149,15 @@ button:disabled {
 
 .question-header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 2px;
+  margin-bottom: 1em;
+}
+
+#question-title, #answer-title {
+  margin: 0;
+  line-height: 1;
 }
 
 .question-subline {
@@ -220,4 +225,23 @@ button:disabled {
   font-weight: bold;
   text-decoration-thickness: 2px;
   text-underline-offset: 2px;
+}
+
+.hint-button {
+  background: #68a9e8;
+  color: #1b2541;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.hint-button:hover {
+  background: #7bb7f0;
+}
+
+.hint-button:disabled {
+  background: #4a5568;
+  color: #a0aec0;
 }

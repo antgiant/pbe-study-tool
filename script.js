@@ -20,6 +20,7 @@ const answerText = document.getElementById('answer-text');
 const answerPointsEl = document.getElementById('answer-points');
 const answerPrevButton = document.getElementById('answer-prev-button');
 const answerNextButton = document.getElementById('answer-next-button');
+const hintButton = document.getElementById('hint-button');
 const minBlanksInput = document.getElementById('min-blanks');
 const maxBlanksInput = document.getElementById('max-blanks');
 const blankLimitHint = document.getElementById('blank-limit');
@@ -136,6 +137,8 @@ let sessionActive = false;
 let questionPointsList = [];
 let questionBlanksList = [];
 let questionAnswersList = [];
+let questionBlankedWordsList = [];
+let hintsRevealedList = [];
 let compromiseReady = false;
 
 const requestPersistentStorage = async () => {
@@ -521,6 +524,8 @@ const handleChapterSelectionChange = () => {
     );
     questionBlanksList = blanksData.map(data => data.blanked);
     questionAnswersList = blanksData.map(data => data.answer);
+    questionBlankedWordsList = blanksData.map(data => data.blankedWords);
+    hintsRevealedList = blanksData.map(() => 0);
     questionIndex = 0;
     updateQuestionView();
   }
@@ -653,27 +658,54 @@ const applyBlanks = (htmlText, blanks) => {
   );
 
   // Replace words in the original HTML, preserving tags
-  let blankedResult = raw;
-  let answerResult = raw;
-  let blankCount = 0;
-
-  // Create a word boundary regex for each word to blank
+  // First, find all matches in order of appearance
+  const matchesInOrder = [];
   wordsToBlank.forEach(word => {
-    if (blankCount >= target) return;
-    // Escape special regex characters
     const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    // Match the word with word boundaries, case insensitive
-    const regex = new RegExp(`\\b${escapedWord}\\b`, 'i');
-    const match = blankedResult.match(regex);
-    if (match) {
-      const matchedWord = match[0];
-      blankedResult = blankedResult.replace(regex, '_________');
-      answerResult = answerResult.replace(regex, `<span class="blanked-word">${matchedWord}</span>`);
-      blankCount++;
+    const regex = new RegExp(`\\b${escapedWord}\\b`, 'ig');
+    let match;
+    while ((match = regex.exec(raw)) !== null) {
+      matchesInOrder.push({
+        word: match[0],
+        index: match.index,
+        lowerWord: word
+      });
+      // Prevent infinite loop on zero-width matches
+      if (match.index === regex.lastIndex) {
+        regex.lastIndex++;
+      }
     }
   });
 
-  return { blanked: blankedResult, answer: answerResult };
+  // Sort by position in text to get order of appearance
+  matchesInOrder.sort((a, b) => a.index - b.index);
+
+  // Take only the target number of matches and track which lowercase words we're using
+  const usedWords = new Set();
+  const blanksToApply = [];
+  for (const match of matchesInOrder) {
+    if (blanksToApply.length >= target) break;
+    // Only use each unique word once (first occurrence)
+    if (!usedWords.has(match.lowerWord)) {
+      blanksToApply.push(match);
+      usedWords.add(match.lowerWord);
+    }
+  }
+
+  // Apply blanks in order and collect the blanked words
+  let blankedResult = raw;
+  let answerResult = raw;
+  const blankedWords = [];
+
+  blanksToApply.forEach(({ word, lowerWord }) => {
+    const escapedWord = lowerWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`\\b${escapedWord}\\b`, 'i');
+    blankedWords.push(word);
+    blankedResult = blankedResult.replace(regex, '_________');
+    answerResult = answerResult.replace(regex, `<span class="blanked-word">${word}</span>`);
+  });
+
+  return { blanked: blankedResult, answer: answerResult, blankedWords };
 };
 
 const updateQuestionView = () => {
@@ -694,9 +726,32 @@ const updateQuestionView = () => {
     const blanksData = applyBlanks(verseData?.text || '', pointsValue);
     questionBlanksList[questionIndex] = blanksData.blanked;
     questionAnswersList[questionIndex] = blanksData.answer;
+    questionBlankedWordsList[questionIndex] = blanksData.blankedWords;
+    hintsRevealedList[questionIndex] = 0;
   }
-  questionText.innerHTML = questionBlanksList[questionIndex];
+
+  // Apply hints if any have been revealed
+  const hintsRevealed = hintsRevealedList[questionIndex] || 0;
+  const blankedWords = questionBlankedWordsList[questionIndex] || [];
+  let displayText = questionBlanksList[questionIndex];
+
+  for (let i = 0; i < hintsRevealed && i < blankedWords.length; i++) {
+    const word = blankedWords[i];
+    const blankRegex = new RegExp('_________', '');
+    displayText = displayText.replace(blankRegex, `<span class="blanked-word">${word}</span>`);
+  }
+
+  questionText.innerHTML = displayText;
   prevButton.disabled = questionIndex === 0;
+
+  // Update hint button state
+  if (hintsRevealed >= blankedWords.length) {
+    hintButton.disabled = true;
+    hintButton.textContent = 'No more hints';
+  } else {
+    hintButton.disabled = false;
+    hintButton.textContent = `Hint (${hintsRevealed}/${blankedWords.length})`;
+  }
 };
 
 const startSession = () => {
@@ -709,6 +764,8 @@ const startSession = () => {
   );
   questionBlanksList = blanksData.map(data => data.blanked);
   questionAnswersList = blanksData.map(data => data.answer);
+  questionBlankedWordsList = blanksData.map(data => data.blankedWords);
+  hintsRevealedList = blanksData.map(() => 0);
   questionIndex = 0;
   toggleSelectors(true);
   updateQuestionView();
@@ -716,6 +773,9 @@ const startSession = () => {
 
 const showAnswer = () => {
   if (!sessionActive || questionOrder.length === 0) return;
+  // Reset hints for current question when leaving question screen
+  hintsRevealedList[questionIndex] = 0;
+
   questionArea.style.display = 'none';
   answerArea.style.display = 'block';
 
@@ -738,6 +798,8 @@ const goNext = () => {
     const blanksData = questionOrder.map((id, idx) => applyBlanks(appState.verseBank[id]?.text || '', questionPointsList[idx]));
     questionBlanksList = blanksData.map(data => data.blanked);
     questionAnswersList = blanksData.map(data => data.answer);
+    questionBlankedWordsList = blanksData.map(data => data.blankedWords);
+    hintsRevealedList = blanksData.map(() => 0);
     questionIndex = 0;
   }
   updateQuestionView();
@@ -746,6 +808,8 @@ const goNext = () => {
 const goPrev = () => {
   if (!sessionActive || questionOrder.length === 0) return;
   if (questionIndex > 0) {
+    // Reset hints for current question before navigating away
+    hintsRevealedList[questionIndex] = 0;
     questionIndex -= 1;
     updateQuestionView();
   }
@@ -761,6 +825,8 @@ const goNextFromAnswer = () => {
     const blanksData = questionOrder.map((id, idx) => applyBlanks(appState.verseBank[id]?.text || '', questionPointsList[idx]));
     questionBlanksList = blanksData.map(data => data.blanked);
     questionAnswersList = blanksData.map(data => data.answer);
+    questionBlankedWordsList = blanksData.map(data => data.blankedWords);
+    hintsRevealedList = blanksData.map(() => 0);
     questionIndex = 0;
   }
   updateQuestionView();
@@ -769,6 +835,17 @@ const goNextFromAnswer = () => {
 const goPrevFromAnswer = () => {
   if (!sessionActive || questionOrder.length === 0) return;
   updateQuestionView();
+};
+
+const revealHint = () => {
+  if (!sessionActive || questionOrder.length === 0) return;
+  const currentHints = hintsRevealedList[questionIndex] || 0;
+  const blankedWords = questionBlankedWordsList[questionIndex] || [];
+
+  if (currentHints < blankedWords.length) {
+    hintsRevealedList[questionIndex] = currentHints + 1;
+    updateQuestionView();
+  }
 };
 
 const toggleChapterSelector = () => {
@@ -810,6 +887,7 @@ startButton.addEventListener('click', startSession);
 selectorsToggle.addEventListener('click', () => toggleSelectors());
 nextButton.addEventListener('click', showAnswer);
 prevButton.addEventListener('click', goPrev);
+hintButton.addEventListener('click', revealHint);
 answerNextButton.addEventListener('click', goNextFromAnswer);
 answerPrevButton.addEventListener('click', goPrevFromAnswer);
 
