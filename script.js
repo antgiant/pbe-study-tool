@@ -34,6 +34,13 @@ const STATUS = {
   NOT_DOWNLOADED: 'not-downloaded',
 };
 const STATE_OF_BEING_WORDS = ['am', 'is', 'are', 'was', 'were', 'be', 'being', 'been'];
+const TFIDF_CONFIG = {
+  verseWeight: 0.6,        // How much to weight verse-level TF-IDF
+  chapterWeight: 0.4,      // How much to weight chapter-level TF-IDF
+  tfidfWeight: 0.5,        // How much TF-IDF influences final score
+  priorityWeight: 0.5,     // How much priority influences final score
+  minWordLength: 2,        // Ignore very short words in TF-IDF
+};
 
 const books = {
   genesis: { id: 1, totalChapters: 50, label: 'Genesis' },
@@ -126,6 +133,10 @@ const defaultState = {
   verseBank: {},
   minBlanks: 1,
   maxBlanks: 1,
+  tfidfCache: {
+    verseLevel: {},
+    chapterLevel: {},
+  },
 };
 
 let appState = { ...defaultState };
@@ -151,6 +162,25 @@ const requestPersistentStorage = async () => {
   }
 };
 
+const migrateTFIDFData = (state) => {
+  // Migrate verses that were downloaded before TF-IDF system was added
+  let migrated = false;
+  Object.entries(state.verseBank || {}).forEach(([id, verse]) => {
+    if (!verse.termFrequency || !verse.wordList) {
+      // This verse needs migration
+      const plainText = stripHtml(verse.text || '');
+      const words = tokenizeText(plainText);
+      verse.termFrequency = calculateTermFrequency(words);
+      verse.wordList = Array.from(new Set(words));
+      migrated = true;
+    }
+  });
+  if (migrated) {
+    console.log('Migrated verse data to include TF-IDF calculations');
+  }
+  return state;
+};
+
 const loadState = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -165,6 +195,8 @@ const loadState = () => {
           entry.status = undefined;
         }
       });
+      // Migrate old verses to include TF-IDF data
+      migrateTFIDFData(normalized);
       return normalized;
     }
     // Backward compatibility with the earlier shape.
@@ -201,6 +233,81 @@ const recomputeActiveVerseIds = () => {
 };
 
 const stripHtml = (html) => html.replace(/<[^>]*>/g, ' ');
+
+const tokenizeText = (text) => {
+  if (!text) return [];
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s]/g, ' ')
+    .split(/\s+/)
+    .filter(word => word.length >= TFIDF_CONFIG.minWordLength);
+};
+
+const calculateTermFrequency = (words) => {
+  if (!words || words.length === 0) return {};
+  const tf = {};
+  const totalWords = words.length;
+  words.forEach(word => {
+    tf[word] = (tf[word] || 0) + 1;
+  });
+  Object.keys(tf).forEach(word => {
+    tf[word] = tf[word] / totalWords;
+  });
+  return tf;
+};
+
+const calculateIDF = (verseIds, verseBank) => {
+  const documentFrequency = {};
+  const totalDocuments = verseIds.length;
+
+  if (totalDocuments === 0) return {};
+
+  verseIds.forEach(id => {
+    const verse = verseBank[id];
+    if (!verse || !verse.wordList) return;
+    const uniqueWords = new Set(verse.wordList);
+    uniqueWords.forEach(word => {
+      documentFrequency[word] = (documentFrequency[word] || 0) + 1;
+    });
+  });
+
+  const idf = {};
+  Object.keys(documentFrequency).forEach(word => {
+    idf[word] = Math.log(totalDocuments / documentFrequency[word]);
+  });
+  return idf;
+};
+
+const combineTfIdf = (tf, idf) => {
+  const tfidf = {};
+  Object.keys(tf).forEach(word => {
+    tfidf[word] = tf[word] * (idf[word] || 0);
+  });
+  return tfidf;
+};
+
+const normalizeScores = (scores) => {
+  const values = Object.values(scores);
+  if (values.length === 0) return {};
+
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min;
+
+  if (range === 0) {
+    const normalized = {};
+    Object.keys(scores).forEach(key => {
+      normalized[key] = 0.5;
+    });
+    return normalized;
+  }
+
+  const normalized = {};
+  Object.keys(scores).forEach(key => {
+    normalized[key] = (scores[key] - min) / range;
+  });
+  return normalized;
+};
 
 const toInt = (value, fallback = 1) => {
   const n = Math.floor(Number(value));
@@ -390,7 +497,22 @@ const storeChapterData = (chapterKey, verses, source) => {
     const id = `${chapterKey},${verse}`;
     verseIds.push(id);
     const { bookId, chapter } = getChapterMeta(chapterKey);
-    appState.verseBank[id] = { bookId, chapter, verse, text, source };
+
+    // Pre-calculate term frequency for TF-IDF
+    const plainText = stripHtml(text);
+    const words = tokenizeText(plainText);
+    const termFrequency = calculateTermFrequency(words);
+    const wordList = Array.from(new Set(words));
+
+    appState.verseBank[id] = {
+      bookId,
+      chapter,
+      verse,
+      text,
+      source,
+      termFrequency,
+      wordList,
+    };
   });
   appState.chapterIndex[chapterKey] = {
     verseIds,
@@ -516,11 +638,14 @@ const handleChapterSelectionChange = () => {
   startDownloadsForSelection();
   updateStartState();
   if (sessionActive) {
+    // Recalculate TF-IDF for new selection
+    calculateSessionTFIDF();
+
     // Rebuild the question order if the selection changed while in session.
     questionOrder = shuffle(appState.activeVerseIds);
     questionPointsList = questionOrder.map((id) => randomPointsValue(id));
     const blanksData = questionOrder.map((id, idx) =>
-      applyBlanks(appState.verseBank[id]?.text || '', questionPointsList[idx])
+      applyBlanks(appState.verseBank[id]?.text || '', questionPointsList[idx], id)
     );
     questionBlanksList = blanksData.map(data => data.blanked);
     questionAnswersList = blanksData.map(data => data.answer);
@@ -563,6 +688,116 @@ const randomPointsValue = (verseId) => {
   const maxAllowed = Math.min(appState.maxBlanks, wordCount);
   const minAllowed = Math.min(appState.minBlanks, maxAllowed);
   return Math.floor(Math.random() * (maxAllowed - minAllowed + 1)) + minAllowed;
+};
+
+const calculateVerseLevelTFIDF = (verseIds, verseBank) => {
+  const idf = calculateIDF(verseIds, verseBank);
+  const verseTfidf = {};
+
+  verseIds.forEach(id => {
+    const verse = verseBank[id];
+    if (!verse || !verse.termFrequency) return;
+    verseTfidf[id] = combineTfIdf(verse.termFrequency, idf);
+  });
+
+  return verseTfidf;
+};
+
+const calculateChapterLevelTFIDF = (verseIds, verseBank) => {
+  // Group verses by chapter
+  const chapterGroups = {};
+  verseIds.forEach(id => {
+    const verse = verseBank[id];
+    if (!verse) return;
+    const chapterKey = `${verse.bookId},${verse.chapter}`;
+    if (!chapterGroups[chapterKey]) {
+      chapterGroups[chapterKey] = [];
+    }
+    chapterGroups[chapterKey].push(id);
+  });
+
+  // Calculate TF for each chapter (aggregate all verses)
+  const chapterTF = {};
+  Object.entries(chapterGroups).forEach(([chapterKey, chapterVerseIds]) => {
+    const allWords = [];
+    chapterVerseIds.forEach(id => {
+      const verse = verseBank[id];
+      if (verse && verse.wordList) {
+        allWords.push(...verse.wordList);
+      }
+    });
+    chapterTF[chapterKey] = calculateTermFrequency(allWords);
+  });
+
+  // Calculate IDF across chapters
+  const documentFrequency = {};
+  const totalChapters = Object.keys(chapterGroups).length;
+
+  Object.values(chapterTF).forEach(tf => {
+    const uniqueWords = new Set(Object.keys(tf));
+    uniqueWords.forEach(word => {
+      documentFrequency[word] = (documentFrequency[word] || 0) + 1;
+    });
+  });
+
+  const chapterIDF = {};
+  Object.keys(documentFrequency).forEach(word => {
+    chapterIDF[word] = Math.log(totalChapters / documentFrequency[word]);
+  });
+
+  // Calculate TF-IDF for each chapter
+  const chapterTfidf = {};
+  Object.entries(chapterTF).forEach(([chapterKey, tf]) => {
+    chapterTfidf[chapterKey] = combineTfIdf(tf, chapterIDF);
+  });
+
+  return chapterTfidf;
+};
+
+const calculateSessionTFIDF = () => {
+  if (appState.activeVerseIds.length === 0) {
+    appState.tfidfCache = { verseLevel: {}, chapterLevel: {} };
+    return;
+  }
+
+  // Calculate verse-level TF-IDF
+  const verseLevelRaw = calculateVerseLevelTFIDF(appState.activeVerseIds, appState.verseBank);
+
+  // Normalize verse-level scores
+  const allVerseScores = {};
+  Object.values(verseLevelRaw).forEach(verseScores => {
+    Object.entries(verseScores).forEach(([word, score]) => {
+      if (!allVerseScores[word]) allVerseScores[word] = [];
+      allVerseScores[word].push(score);
+    });
+  });
+
+  const verseLevelNormalized = {};
+  Object.entries(verseLevelRaw).forEach(([verseId, scores]) => {
+    verseLevelNormalized[verseId] = normalizeScores(scores);
+  });
+
+  // Calculate chapter-level TF-IDF
+  const chapterLevelRaw = calculateChapterLevelTFIDF(appState.activeVerseIds, appState.verseBank);
+
+  // Normalize chapter-level scores
+  const allChapterScores = {};
+  Object.values(chapterLevelRaw).forEach(chapterScores => {
+    Object.entries(chapterScores).forEach(([word, score]) => {
+      if (!allChapterScores[word]) allChapterScores[word] = [];
+      allChapterScores[word].push(score);
+    });
+  });
+
+  const chapterLevelNormalized = {};
+  Object.entries(chapterLevelRaw).forEach(([chapterKey, scores]) => {
+    chapterLevelNormalized[chapterKey] = normalizeScores(scores);
+  });
+
+  appState.tfidfCache = {
+    verseLevel: verseLevelNormalized,
+    chapterLevel: chapterLevelNormalized,
+  };
 };
 
 const normalizeTextForNlp = (text) => {
@@ -615,9 +850,9 @@ const normalizeTextForNlp = (text) => {
   return parts.join(', ');
 };
 
-const applyBlanks = (htmlText, blanks) => {
+const applyBlanks = (htmlText, blanks, verseId) => {
   const raw = (htmlText || '').trim();
-  if (!raw) return { blanked: '', answer: '' };
+  if (!raw) return { blanked: '', answer: '', blankedWords: [] };
 
   // Parse plain text with NLP, but keep track of original HTML
   const plainText = stripHtml(raw);
@@ -630,6 +865,12 @@ const applyBlanks = (htmlText, blanks) => {
           .flatMap((s) => s.terms || [])
           .map((t, idx) => ({ ...t, idx }))
       : plainText.split(/\s+/).map((w, idx) => ({ text: w, idx, tags: [] }));
+
+  // Get TF-IDF scores for this verse
+  const verse = appState.verseBank[verseId];
+  const verseTfidf = appState.tfidfCache?.verseLevel?.[verseId] || {};
+  const chapterKey = verse ? `${verse.bookId},${verse.chapter}` : null;
+  const chapterTfidf = chapterKey ? (appState.tfidfCache?.chapterLevel?.[chapterKey] || {}) : {};
 
   const hasTag = (term, tags) => term.tags?.some((tag) => tags.includes(tag));
 
@@ -670,7 +911,7 @@ const applyBlanks = (htmlText, blanks) => {
     'philistines', 'egyptians', 'babylonians', 'assyrians', 'romans', 'persians', 'medes',
   ]);
 
-  // Assign priority to each term but keep all terms (including punctuation)
+  // Assign priority to each term and calculate combined TF-IDF + priority score
   const termsWithPriority = termJson.map((t) => {
     const isPunct = hasTag(t, ['Punctuation']);
     const lowerText = (t.text || '').toLowerCase();
@@ -679,29 +920,40 @@ const applyBlanks = (htmlText, blanks) => {
     // Check for function words first (overrides tag-based classification)
     if (FUNCTION_WORDS.has(lowerText)) {
       priority = 4;
-    } else if (PRIORITY_WORDS.has(lowerText) || hasTag(t, ['Person', 'Place', 'Organization', 'ProperNoun', 'Date', 'Value', 'Cardinal', 'Ordinal'])) {
+    } else if (PRIORITY_WORDS.has(lowerText) || hasTag(t, ['Person', 'Place', 'Organization', 'Date', 'Value', 'Cardinal', 'Ordinal'])) {
       priority = 1;
     } else if (hasTag(t, ['Noun', 'Verb', 'Gerund'])) {
       priority = 2;
-    } else if (hasTag(t, ['Interjection', 'Expression', 'Adjective', 'Adverb'])) {
+    } else if (hasTag(t, ['Interjection', 'Expression', 'Adjective', 'Adverb', 'ProperNoun'])) {
       priority = 3;
     } else if (hasTag(t, ['Preposition', 'Conjunction', 'Determiner', 'Pronoun', 'Articles', 'StatesofBeingVerbs'])) {
       priority = 4;
     }
-    return { ...t, isPunct, priority };
+
+    // Calculate combined TF-IDF score (verse-level + chapter-level)
+    const verseTfidfScore = verseTfidf[lowerText] || 0;
+    const chapterTfidfScore = chapterTfidf[lowerText] || 0;
+    const combinedTfidf = (verseTfidfScore * TFIDF_CONFIG.verseWeight) + (chapterTfidfScore * TFIDF_CONFIG.chapterWeight);
+
+    // Convert priority to score (1-5 -> 1.0-0.2)
+    const priorityScore = (6 - priority) / 5;
+
+    // Calculate final weighted score
+    const finalScore = (combinedTfidf * TFIDF_CONFIG.tfidfWeight) + (priorityScore * TFIDF_CONFIG.priorityWeight);
+
+    return { ...t, isPunct, priority, tfidfScore: combinedTfidf, finalScore };
   });
 
   // Filter to get only non-punctuation candidates
   const candidates = termsWithPriority.filter((t) => !t.isPunct);
 
+  // Sort candidates by finalScore (descending - higher score = more important)
+  const sortedCandidates = [...candidates].sort((a, b) => b.finalScore - a.finalScore);
+
+  // Select top N candidates
   const chosen = new Set();
   const target = Math.min(blanks, candidates.length);
-  for (let p = 1; p <= 5 && chosen.size < target; p += 1) {
-    const bucket = candidates.filter((c) => c.priority === p && !chosen.has(c.idx));
-    shuffle(bucket).forEach((c) => {
-      if (chosen.size < target) chosen.add(c.idx);
-    });
-  }
+  sortedCandidates.slice(0, target).forEach((c) => chosen.add(c.idx));
 
   // Build a set of plain text words to blank
   const wordsToBlank = new Set(
@@ -774,7 +1026,7 @@ const updateQuestionView = () => {
     questionPointsList[questionIndex] ?? (questionPointsList[questionIndex] = randomPointsValue(verseId));
   questionPointsEl.textContent = `${pointsValue} Points`;
   if (!questionBlanksList[questionIndex]) {
-    const blanksData = applyBlanks(verseData?.text || '', pointsValue);
+    const blanksData = applyBlanks(verseData?.text || '', pointsValue, verseId);
     questionBlanksList[questionIndex] = blanksData.blanked;
     questionAnswersList[questionIndex] = blanksData.answer;
     questionBlankedWordsList[questionIndex] = blanksData.blankedWords;
@@ -808,10 +1060,14 @@ const updateQuestionView = () => {
 const startSession = () => {
   if (appState.activeVerseIds.length === 0) return;
   sessionActive = true;
+
+  // Calculate TF-IDF for current selection
+  calculateSessionTFIDF();
+
   questionOrder = shuffle(appState.activeVerseIds);
   questionPointsList = questionOrder.map((id) => randomPointsValue(id));
   const blanksData = questionOrder.map((id, idx) =>
-    applyBlanks(appState.verseBank[id]?.text || '', questionPointsList[idx])
+    applyBlanks(appState.verseBank[id]?.text || '', questionPointsList[idx], id)
   );
   questionBlanksList = blanksData.map(data => data.blanked);
   questionAnswersList = blanksData.map(data => data.answer);
@@ -846,7 +1102,7 @@ const goNext = () => {
   } else {
     questionOrder = shuffle(appState.activeVerseIds);
     questionPointsList = questionOrder.map((id) => randomPointsValue(id));
-    const blanksData = questionOrder.map((id, idx) => applyBlanks(appState.verseBank[id]?.text || '', questionPointsList[idx]));
+    const blanksData = questionOrder.map((id, idx) => applyBlanks(appState.verseBank[id]?.text || '', questionPointsList[idx], id));
     questionBlanksList = blanksData.map(data => data.blanked);
     questionAnswersList = blanksData.map(data => data.answer);
     questionBlankedWordsList = blanksData.map(data => data.blankedWords);
@@ -873,7 +1129,7 @@ const goNextFromAnswer = () => {
   } else {
     questionOrder = shuffle(appState.activeVerseIds);
     questionPointsList = questionOrder.map((id) => randomPointsValue(id));
-    const blanksData = questionOrder.map((id, idx) => applyBlanks(appState.verseBank[id]?.text || '', questionPointsList[idx]));
+    const blanksData = questionOrder.map((id, idx) => applyBlanks(appState.verseBank[id]?.text || '', questionPointsList[idx], id));
     questionBlanksList = blanksData.map(data => data.blanked);
     questionAnswersList = blanksData.map(data => data.answer);
     questionBlankedWordsList = blanksData.map(data => data.blankedWords);
@@ -964,6 +1220,8 @@ maxBlanksInput.addEventListener('input', () => {
 const initialState = loadState();
 if (initialState) {
   appState = initialState;
+  // Save the migrated state back to localStorage
+  saveState();
 }
 if (appState.year) {
   seasonSelect.value = appState.year;
