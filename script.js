@@ -1038,17 +1038,29 @@ const applyBlanks = (htmlText, blanks, verseId) => {
   }
 
   // Apply blanks in order and collect the blanked words
-  let blankedResult = raw;
-  let answerResult = raw;
+  let blankedResult = '';
+  let answerResult = '';
   const blankedWords = [];
+  let cursor = 0;
 
-  blanksToApply.forEach(({ word, lowerWord }) => {
-    const escapedWord = lowerWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(`\\b${escapedWord}\\b`, 'i');
+  blanksToApply.forEach(({ word, lowerWord, index }) => {
+    // Append text up to the word, then the replacement. Use indices to avoid touching injected markup.
+    const idx = typeof index === 'number' ? index : raw.indexOf(word, cursor);
+    if (idx < cursor || idx === -1) {
+      return;
+    }
+    blankedResult += raw.slice(cursor, idx);
+    answerResult += raw.slice(cursor, idx);
+
     blankedWords.push(word);
-    blankedResult = blankedResult.replace(regex, '_________');
-    answerResult = answerResult.replace(regex, `<span class="blanked-word">${word}</span>`);
+    blankedResult += '_________';
+    answerResult += `<span class="blanked-word">${word}</span>`;
+    cursor = idx + word.length;
   });
+
+  // Append any remaining text after the last replacement
+  blankedResult += raw.slice(cursor);
+  answerResult += raw.slice(cursor);
 
   return { blanked: blankedResult, answer: answerResult, blankedWords };
 };
