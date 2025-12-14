@@ -304,6 +304,16 @@ const toggleSelectors = (forceState) => {
       : selectorsContainer.classList.contains('collapsed') === false;
   selectorsContainer.classList.toggle('collapsed', shouldCollapse);
   selectorsToggle.textContent = shouldCollapse ? 'Settings ▸' : 'Settings ▾';
+  startButton.style.display = shouldCollapse ? 'none' : 'inline-flex';
+
+  // Hide question and answer areas when settings are visible
+  if (!shouldCollapse) {
+    questionArea.style.display = 'none';
+    answerArea.style.display = 'none';
+  } else if (sessionActive) {
+    // Show the appropriate area when settings are collapsed during a session
+    updateQuestionView();
+  }
 };
 
 const updateChapterIndicators = () => {
