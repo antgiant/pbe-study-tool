@@ -440,6 +440,35 @@ const updateChapterIndicators = () => {
   });
 };
 
+const renderYearOptions = (selectedYear = '') => {
+  seasonSelect.innerHTML = '';
+  const emptyOption = document.createElement('option');
+  emptyOption.value = '';
+  seasonSelect.appendChild(emptyOption);
+
+  Object.keys(chaptersByYear).forEach((yearKey) => {
+    const option = document.createElement('option');
+    option.value = yearKey;
+    const parts = (chaptersByYear[yearKey] || [])
+      .map(({ bookKey, start, end }) => {
+        const meta = books[bookKey];
+        if (!meta) return null;
+        const cappedEnd = Math.min(end, meta.totalChapters);
+        const bookLabel = meta.label || bookKey;
+        // If the selection covers the whole book, show only the book name.
+        if (start === 1 && cappedEnd === meta.totalChapters) {
+          return `${bookLabel}`;
+        }
+        return `${bookLabel} ${start}-${cappedEnd}`;
+      })
+      .filter(Boolean);
+    const description = parts.length ? ` - ${parts.join('; ')}` : '';
+    option.textContent = `${yearKey}${description}`;
+    option.selected = selectedYear === yearKey;
+    seasonSelect.appendChild(option);
+  });
+};
+
 const renderChapterOptions = (year, selectedValues = new Set()) => {
   optionsContainer.innerHTML = '';
   const selections = chaptersByYear[year] || [];
@@ -1223,6 +1252,7 @@ if (initialState) {
   // Save the migrated state back to localStorage
   saveState();
 }
+renderYearOptions(appState.year);
 if (appState.year) {
   seasonSelect.value = appState.year;
 }
