@@ -23,6 +23,7 @@ const answerNextButton = document.getElementById('answer-next-button');
 const hintButton = document.getElementById('hint-button');
 const minBlanksInput = document.getElementById('min-blanks');
 const maxBlanksInput = document.getElementById('max-blanks');
+const maxBlankPercentageInput = document.getElementById('max-blank-percentage');
 const blankLimitHint = document.getElementById('blank-limit');
 
 const STORAGE_KEY = 'pbeSettings';
@@ -135,8 +136,9 @@ const defaultState = {
   maxBlanks: 1,
   tfidfCache: {
     verseLevel: {},
-    chapterLevel: {},
+  chapterLevel: {},
   },
+  maxBlankPercentage: 100,
 };
 
 let appState = { ...defaultState };
@@ -360,19 +362,25 @@ const updateBlankInputs = () => {
   const maxWords = computeMaxWordsInActiveSelection();
   const maxVal = Math.max(1, Math.min(toInt(appState.maxBlanks, maxWords), maxWords));
   const minVal = Math.max(1, Math.min(toInt(appState.minBlanks, 1), maxVal));
+  const percentVal = Math.max(1, Math.min(toInt(appState.maxBlankPercentage, 100), 100));
 
   appState.minBlanks = minVal;
   appState.maxBlanks = maxVal;
+  appState.maxBlankPercentage = percentVal;
 
   minBlanksInput.min = 1;
   minBlanksInput.max = maxVal;
   maxBlanksInput.min = 1;
   maxBlanksInput.max = maxWords;
+  maxBlankPercentageInput.min = 1;
+  maxBlankPercentageInput.max = 100;
 
   minBlanksInput.value = appState.minBlanks;
   maxBlanksInput.value = appState.maxBlanks;
+  maxBlankPercentageInput.value = appState.maxBlankPercentage;
 
-  blankLimitHint.textContent = `Min can go up to current max (${maxVal}); max allowed is ${maxWords} based on selected verses.`;
+  const percentCap = Math.max(1, Math.floor((appState.maxBlankPercentage / 100) * maxWords));
+  blankLimitHint.textContent = `Min can go up to current max (${maxVal}); max allowed is ${Math.min(maxWords, percentCap)} based on selected verses and ${appState.maxBlankPercentage}% cap.`;
   saveState();
 };
 
@@ -713,8 +721,9 @@ const randomPointsValue = (verseId) => {
   const verse = appState.verseBank[verseId];
   const plain = verse?.text ? stripHtml(verse.text).trim() : '';
   const wordCount = plain ? plain.split(/\s+/).filter(Boolean).length : 1;
-  const maxAllowed = Math.min(appState.maxBlanks, wordCount);
-  const minAllowed = Math.min(appState.minBlanks, maxAllowed);
+  const percentCap = Math.max(1, Math.floor((appState.maxBlankPercentage / 100) * wordCount));
+  const maxAllowed = Math.max(1, Math.min(appState.maxBlanks, wordCount, percentCap));
+  const minAllowed = Math.max(1, Math.min(appState.minBlanks, maxAllowed));
   return Math.floor(Math.random() * (maxAllowed - minAllowed + 1)) + minAllowed;
 };
 
@@ -885,9 +894,10 @@ const applyBlanks = (htmlText, blanks, verseId) => {
   // Parse plain text with NLP, but keep track of original HTML
   const plainText = stripHtml(raw);
   const wordCount = plainText ? plainText.split(/\s+/).filter(Boolean).length : 0;
-  // Never request more blanks than there are words in the verse
+  // Never request more blanks than there are words in the verse and percentage cap
   const blanksRequested = Math.max(0, blanks);
-  const maxBlanksAllowed = Math.max(0, Math.min(blanksRequested, wordCount));
+  const percentCap = Math.max(1, Math.floor((appState.maxBlankPercentage / 100) * wordCount));
+  const maxBlanksAllowed = Math.max(0, Math.min(blanksRequested, wordCount, percentCap));
   const normalizedText = normalizeTextForNlp(plainText);
   const doc = typeof nlp !== 'undefined' ? nlp(normalizedText) : null;
   const termJson =
@@ -1246,6 +1256,12 @@ maxBlanksInput.addEventListener('input', () => {
   if (appState.maxBlanks < appState.minBlanks) {
     appState.minBlanks = appState.maxBlanks;
   }
+  updateBlankInputs();
+});
+
+maxBlankPercentageInput.addEventListener('input', () => {
+  const value = Math.max(1, toInt(maxBlankPercentageInput.value, 100));
+  appState.maxBlankPercentage = Math.min(value, 100);
   updateBlankInputs();
 });
 
