@@ -573,6 +573,7 @@ const applyBlanks = (htmlText, blanks) => {
     'in', 'on', 'at', 'to', 'from', 'by', 'with', 'about', 'against', 'between', 'into', 'through', 'during', 'before', 'after', 'above', 'below', 'up', 'down', 'of', 'off', 'over', 'under', 'upon', // prepositions
     'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them', 'my', 'your', 'his', 'their', 'our', // pronouns
     'this', 'that', 'these', 'those', // demonstratives
+    'am', 'is', 'are', 'was', 'were', 'be', 'being', 'been', // state-of-being verbs
   ]);
 
   // Assign priority to each term but keep all terms (including punctuation)
