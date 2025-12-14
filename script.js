@@ -574,6 +574,7 @@ const applyBlanks = (htmlText, blanks) => {
     'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them', 'my', 'your', 'his', 'their', 'our', // pronouns
     'this', 'that', 'these', 'those', // demonstratives
     'am', 'is', 'are', 'was', 'were', 'be', 'being', 'been', // state-of-being verbs
+    'will', 'would', 'shall', 'should', 'can', 'could', 'may', 'might', 'must', 'do', 'does', 'did', 'have', 'has', 'had', // modal and auxiliary verbs
   ]);
 
   // Assign priority to each term but keep all terms (including punctuation)
