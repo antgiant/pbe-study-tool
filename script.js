@@ -577,6 +577,32 @@ const applyBlanks = (htmlText, blanks) => {
     'will', 'would', 'shall', 'should', 'can', 'could', 'may', 'might', 'must', 'do', 'does', 'did', 'have', 'has', 'had', // modal and auxiliary verbs
   ]);
 
+  // Biblical proper names and important terms that should be high priority
+  const PRIORITY_WORDS = new Set([
+    // Divine names and titles
+    'lord', 'god', 'jesus', 'christ', 'messiah', 'savior', 'redeemer', 'spirit', 'father', 'holy', 'almighty', 'yahweh', 'jehovah',
+    // Patriarchs and early figures
+    'adam', 'eve', 'noah', 'abraham', 'sarah', 'isaac', 'rebekah', 'jacob', 'rachel', 'leah', 'joseph',
+    // Moses and Exodus era
+    'moses', 'aaron', 'miriam', 'pharaoh', 'joshua', 'caleb',
+    // Judges and early Israel
+    'gideon', 'samson', 'deborah', 'samuel', 'eli',
+    // Kings and prophets
+    'saul', 'david', 'solomon', 'elijah', 'elisha', 'isaiah', 'jeremiah', 'ezekiel', 'daniel',
+    'hosea', 'joel', 'amos', 'obadiah', 'jonah', 'micah', 'nahum', 'habakkuk', 'zephaniah', 'haggai', 'zechariah', 'malachi',
+    // New Testament figures
+    'mary', 'joseph', 'john', 'peter', 'paul', 'matthew', 'mark', 'luke', 'james', 'andrew', 'philip', 'bartholomew', 'thomas', 'judas', 'simon', 'thaddaeus',
+    'stephen', 'barnabas', 'timothy', 'titus', 'silas', 'apollos', 'priscilla', 'aquila',
+    'pilate', 'herod', 'caesar', 'caiaphas',
+    // Places
+    'israel', 'jerusalem', 'zion', 'bethlehem', 'nazareth', 'galilee', 'judea', 'samaria', 'egypt', 'babylon', 'assyria',
+    'canaan', 'jordan', 'sinai', 'horeb', 'carmel', 'olivet', 'gethsemane', 'calvary', 'golgotha',
+    'eden', 'babel', 'sodom', 'gomorrah', 'jericho', 'damascus', 'nineveh', 'tarsus', 'corinth', 'ephesus', 'rome', 'macedonia', 'athens',
+    // Peoples and groups
+    'israelites', 'hebrews', 'jews', 'gentiles', 'pharisees', 'sadducees', 'levites', 'priests', 'disciples', 'apostles',
+    'philistines', 'egyptians', 'babylonians', 'assyrians', 'romans', 'persians', 'medes',
+  ]);
+
   // Assign priority to each term but keep all terms (including punctuation)
   const termsWithPriority = termJson.map((t) => {
     const isPunct = hasTag(t, ['Punctuation']);
@@ -586,7 +612,7 @@ const applyBlanks = (htmlText, blanks) => {
     // Check for function words first (overrides tag-based classification)
     if (FUNCTION_WORDS.has(lowerText)) {
       priority = 4;
-    } else if (hasTag(t, ['Person', 'Place', 'Organization', 'ProperNoun', 'Date', 'Value', 'Cardinal', 'Ordinal'])) {
+    } else if (PRIORITY_WORDS.has(lowerText) || hasTag(t, ['Person', 'Place', 'Organization', 'ProperNoun', 'Date', 'Value', 'Cardinal', 'Ordinal'])) {
       priority = 1;
     } else if (hasTag(t, ['Noun', 'Verb', 'Adjective', 'Gerund'])) {
       priority = 2;
