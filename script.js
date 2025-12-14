@@ -127,6 +127,7 @@ let questionOrder = [];
 let questionIndex = 0;
 let sessionActive = false;
 let questionPointsList = [];
+let questionBlanksList = [];
 let compromiseReady = false;
 
 const requestPersistentStorage = async () => {
@@ -177,7 +178,6 @@ const saveState = () => {
     console.warn('Unable to save settings', err);
   }
 };
-
 const recomputeActiveVerseIds = () => {
   const ids = [];
   appState.activeChapters.forEach((chapterKey) => {
@@ -498,6 +498,9 @@ const handleChapterSelectionChange = () => {
     // Rebuild the question order if the selection changed while in session.
     questionOrder = shuffle(appState.activeVerseIds);
     questionPointsList = questionOrder.map((id) => randomPointsValue(id));
+    questionBlanksList = questionOrder.map((id, idx) =>
+      applyBlanks(appState.verseBank[id]?.text || '', questionPointsList[idx])
+    );
     questionIndex = 0;
     updateQuestionView();
   }
@@ -537,6 +540,91 @@ const randomPointsValue = (verseId) => {
   return Math.floor(Math.random() * (maxAllowed - minAllowed + 1)) + minAllowed;
 };
 
+const applyBlanks = (htmlText, blanks) => {
+  const raw = (htmlText || '').trim();
+  if (!raw) return '';
+
+  // Parse plain text with NLP, but keep track of original HTML
+  const plainText = stripHtml(raw);
+  const doc = typeof nlp !== 'undefined' ? nlp(plainText) : null;
+  const termJson =
+    doc && doc.json
+      ? doc
+          .json({ terms: true })
+          .flatMap((s) => s.terms || [])
+          .map((t, idx) => ({ ...t, idx }))
+      : plainText.split(/\s+/).map((w, idx) => ({ text: w, idx, tags: [] }));
+
+  const hasTag = (term, tags) => term.tags?.some((tag) => tags.includes(tag));
+
+  // Common function words that should always be low priority, even when capitalized
+  const FUNCTION_WORDS = new Set([
+    'and', 'or', 'but', 'nor', 'yet', 'so', 'for', // conjunctions
+    'the', 'a', 'an', // articles
+    'in', 'on', 'at', 'to', 'from', 'by', 'with', 'about', 'against', 'between', 'into', 'through', 'during', 'before', 'after', 'above', 'below', 'up', 'down', 'of', 'off', 'over', 'under', 'upon', // prepositions
+    'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them', 'my', 'your', 'his', 'their', 'our', // pronouns
+    'this', 'that', 'these', 'those', // demonstratives
+  ]);
+
+  // Assign priority to each term but keep all terms (including punctuation)
+  const termsWithPriority = termJson.map((t) => {
+    const isPunct = hasTag(t, ['Punctuation']);
+    const lowerText = (t.text || '').toLowerCase();
+    let priority = 5;
+
+    // Check for function words first (overrides tag-based classification)
+    if (FUNCTION_WORDS.has(lowerText)) {
+      priority = 4;
+    } else if (hasTag(t, ['Person', 'Place', 'Organization', 'ProperNoun', 'Date', 'Value', 'Cardinal', 'Ordinal'])) {
+      priority = 1;
+    } else if (hasTag(t, ['Noun', 'Verb', 'Adjective', 'Gerund'])) {
+      priority = 2;
+    } else if (hasTag(t, ['Interjection', 'Expression'])) {
+      priority = 3;
+    } else if (hasTag(t, ['Preposition', 'Conjunction', 'Determiner', 'Pronoun', 'StatesofBeingVerbs'])) {
+      priority = 4;
+    }
+    return { ...t, isPunct, priority };
+  });
+
+  // Filter to get only non-punctuation candidates
+  const candidates = termsWithPriority.filter((t) => !t.isPunct);
+
+  const chosen = new Set();
+  const target = Math.min(blanks, candidates.length);
+  for (let p = 1; p <= 5 && chosen.size < target; p += 1) {
+    const bucket = candidates.filter((c) => c.priority === p && !chosen.has(c.idx));
+    shuffle(bucket).forEach((c) => {
+      if (chosen.size < target) chosen.add(c.idx);
+    });
+  }
+
+  // Build a set of plain text words to blank
+  const wordsToBlank = new Set(
+    Array.from(chosen).map(idx => termsWithPriority[idx]?.text?.toLowerCase()).filter(Boolean)
+  );
+
+  // Replace words in the original HTML, preserving tags
+  let result = raw;
+  let blankCount = 0;
+
+  // Create a word boundary regex for each word to blank
+  wordsToBlank.forEach(word => {
+    if (blankCount >= target) return;
+    // Escape special regex characters
+    const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Match the word with word boundaries, case insensitive
+    const regex = new RegExp(`\\b${escapedWord}\\b`, 'i');
+    const match = result.match(regex);
+    if (match) {
+      result = result.replace(regex, '_________');
+      blankCount++;
+    }
+  });
+
+  return result;
+};
+
 const updateQuestionView = () => {
   if (!sessionActive || questionOrder.length === 0) {
     questionArea.style.display = 'none';
@@ -547,10 +635,13 @@ const updateQuestionView = () => {
   const verseData = appState.verseBank[verseId];
   questionTitle.textContent = `Question ${questionIndex + 1}`;
   questionReference.textContent = verseReference(verseId);
-  questionText.innerHTML = verseData ? verseData.text : '';
   const pointsValue =
     questionPointsList[questionIndex] ?? (questionPointsList[questionIndex] = randomPointsValue(verseId));
   questionPointsEl.textContent = `${pointsValue} Points`;
+  if (!questionBlanksList[questionIndex]) {
+    questionBlanksList[questionIndex] = applyBlanks(verseData?.text || '', pointsValue);
+  }
+  questionText.innerHTML = questionBlanksList[questionIndex];
   prevButton.disabled = questionIndex === 0;
 };
 
@@ -559,6 +650,9 @@ const startSession = () => {
   sessionActive = true;
   questionOrder = shuffle(appState.activeVerseIds);
   questionPointsList = questionOrder.map((id) => randomPointsValue(id));
+  questionBlanksList = questionOrder.map((id, idx) =>
+    applyBlanks(appState.verseBank[id]?.text || '', questionPointsList[idx])
+  );
   questionIndex = 0;
   toggleSelectors(true);
   updateQuestionView();
@@ -571,6 +665,7 @@ const goNext = () => {
   } else {
     questionOrder = shuffle(appState.activeVerseIds);
     questionPointsList = questionOrder.map((id) => randomPointsValue(id));
+    questionBlanksList = questionOrder.map((id, idx) => applyBlanks(appState.verseBank[id]?.text || '', questionPointsList[idx]));
     questionIndex = 0;
   }
   updateQuestionView();
