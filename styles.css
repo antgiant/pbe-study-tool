@@ -214,3 +214,10 @@ button:disabled {
 .chapter-status.not-downloaded {
   color: #d6e2f7;
 }
+
+.blanked-word {
+  text-decoration: underline;
+  font-weight: bold;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 2px;
+}

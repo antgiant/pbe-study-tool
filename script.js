@@ -13,6 +13,12 @@ const questionText = document.getElementById('question-text');
 const questionPointsEl = document.getElementById('question-points');
 const prevButton = document.getElementById('prev-button');
 const nextButton = document.getElementById('next-button');
+const answerArea = document.getElementById('answer-area');
+const answerTitle = document.getElementById('answer-title');
+const answerReference = document.getElementById('answer-reference');
+const answerText = document.getElementById('answer-text');
+const answerPointsEl = document.getElementById('answer-points');
+const continueButton = document.getElementById('continue-button');
 const minBlanksInput = document.getElementById('min-blanks');
 const maxBlanksInput = document.getElementById('max-blanks');
 const blankLimitHint = document.getElementById('blank-limit');
@@ -128,6 +134,7 @@ let questionIndex = 0;
 let sessionActive = false;
 let questionPointsList = [];
 let questionBlanksList = [];
+let questionAnswersList = [];
 let compromiseReady = false;
 
 const requestPersistentStorage = async () => {
@@ -498,9 +505,11 @@ const handleChapterSelectionChange = () => {
     // Rebuild the question order if the selection changed while in session.
     questionOrder = shuffle(appState.activeVerseIds);
     questionPointsList = questionOrder.map((id) => randomPointsValue(id));
-    questionBlanksList = questionOrder.map((id, idx) =>
+    const blanksData = questionOrder.map((id, idx) =>
       applyBlanks(appState.verseBank[id]?.text || '', questionPointsList[idx])
     );
+    questionBlanksList = blanksData.map(data => data.blanked);
+    questionAnswersList = blanksData.map(data => data.answer);
     questionIndex = 0;
     updateQuestionView();
   }
@@ -542,7 +551,7 @@ const randomPointsValue = (verseId) => {
 
 const applyBlanks = (htmlText, blanks) => {
   const raw = (htmlText || '').trim();
-  if (!raw) return '';
+  if (!raw) return { blanked: '', answer: '' };
 
   // Parse plain text with NLP, but keep track of original HTML
   const plainText = stripHtml(raw);
@@ -605,7 +614,8 @@ const applyBlanks = (htmlText, blanks) => {
   );
 
   // Replace words in the original HTML, preserving tags
-  let result = raw;
+  let blankedResult = raw;
+  let answerResult = raw;
   let blankCount = 0;
 
   // Create a word boundary regex for each word to blank
@@ -615,14 +625,16 @@ const applyBlanks = (htmlText, blanks) => {
     const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     // Match the word with word boundaries, case insensitive
     const regex = new RegExp(`\\b${escapedWord}\\b`, 'i');
-    const match = result.match(regex);
+    const match = blankedResult.match(regex);
     if (match) {
-      result = result.replace(regex, '_________');
+      const matchedWord = match[0];
+      blankedResult = blankedResult.replace(regex, '_________');
+      answerResult = answerResult.replace(regex, `<span class="blanked-word">${matchedWord}</span>`);
       blankCount++;
     }
   });
 
-  return result;
+  return { blanked: blankedResult, answer: answerResult };
 };
 
 const updateQuestionView = () => {
@@ -631,6 +643,7 @@ const updateQuestionView = () => {
     return;
   }
   questionArea.style.display = 'block';
+  answerArea.style.display = 'none';
   const verseId = questionOrder[questionIndex];
   const verseData = appState.verseBank[verseId];
   questionTitle.textContent = `Question ${questionIndex + 1}`;
@@ -639,7 +652,9 @@ const updateQuestionView = () => {
     questionPointsList[questionIndex] ?? (questionPointsList[questionIndex] = randomPointsValue(verseId));
   questionPointsEl.textContent = `${pointsValue} Points`;
   if (!questionBlanksList[questionIndex]) {
-    questionBlanksList[questionIndex] = applyBlanks(verseData?.text || '', pointsValue);
+    const blanksData = applyBlanks(verseData?.text || '', pointsValue);
+    questionBlanksList[questionIndex] = blanksData.blanked;
+    questionAnswersList[questionIndex] = blanksData.answer;
   }
   questionText.innerHTML = questionBlanksList[questionIndex];
   prevButton.disabled = questionIndex === 0;
@@ -650,12 +665,27 @@ const startSession = () => {
   sessionActive = true;
   questionOrder = shuffle(appState.activeVerseIds);
   questionPointsList = questionOrder.map((id) => randomPointsValue(id));
-  questionBlanksList = questionOrder.map((id, idx) =>
+  const blanksData = questionOrder.map((id, idx) =>
     applyBlanks(appState.verseBank[id]?.text || '', questionPointsList[idx])
   );
+  questionBlanksList = blanksData.map(data => data.blanked);
+  questionAnswersList = blanksData.map(data => data.answer);
   questionIndex = 0;
   toggleSelectors(true);
   updateQuestionView();
+};
+
+const showAnswer = () => {
+  if (!sessionActive || questionOrder.length === 0) return;
+  questionArea.style.display = 'none';
+  answerArea.style.display = 'block';
+
+  const verseId = questionOrder[questionIndex];
+  answerTitle.textContent = `Answer ${questionIndex + 1}`;
+  answerReference.textContent = verseReference(verseId);
+  const pointsValue = questionPointsList[questionIndex];
+  answerPointsEl.textContent = `${pointsValue} Points`;
+  answerText.innerHTML = questionAnswersList[questionIndex];
 };
 
 const goNext = () => {
@@ -665,7 +695,9 @@ const goNext = () => {
   } else {
     questionOrder = shuffle(appState.activeVerseIds);
     questionPointsList = questionOrder.map((id) => randomPointsValue(id));
-    questionBlanksList = questionOrder.map((id, idx) => applyBlanks(appState.verseBank[id]?.text || '', questionPointsList[idx]));
+    const blanksData = questionOrder.map((id, idx) => applyBlanks(appState.verseBank[id]?.text || '', questionPointsList[idx]));
+    questionBlanksList = blanksData.map(data => data.blanked);
+    questionAnswersList = blanksData.map(data => data.answer);
     questionIndex = 0;
   }
   updateQuestionView();
@@ -713,7 +745,8 @@ selectAll.addEventListener('change', (event) => {
 
 startButton.addEventListener('click', startSession);
 selectorsToggle.addEventListener('click', () => toggleSelectors());
-nextButton.addEventListener('click', goNext);
+nextButton.addEventListener('click', showAnswer);
+continueButton.addEventListener('click', goNext);
 prevButton.addEventListener('click', goPrev);
 
 minBlanksInput.addEventListener('input', () => {
