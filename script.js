@@ -565,13 +565,64 @@ const randomPointsValue = (verseId) => {
   return Math.floor(Math.random() * (maxAllowed - minAllowed + 1)) + minAllowed;
 };
 
+const normalizeTextForNlp = (text) => {
+  // Remove capitalization from words following commas, except for priority_words
+  const PRIORITY_WORDS = new Set([
+    // Divine names and titles
+    'lord', 'god', 'jesus', 'christ', 'messiah', 'savior', 'redeemer', 'spirit', 'father', 'holy', 'almighty', 'yahweh', 'jehovah',
+    // Patriarchs and early figures
+    'adam', 'eve', 'noah', 'abraham', 'sarah', 'isaac', 'rebekah', 'jacob', 'rachel', 'leah', 'joseph',
+    // Moses and Exodus era
+    'moses', 'aaron', 'miriam', 'pharaoh', 'joshua', 'caleb',
+    // Judges and early Israel
+    'gideon', 'samson', 'deborah', 'samuel', 'eli',
+    // Kings and prophets
+    'saul', 'david', 'solomon', 'elijah', 'elisha', 'isaiah', 'jeremiah', 'ezekiel', 'daniel',
+    'hosea', 'joel', 'amos', 'obadiah', 'jonah', 'micah', 'nahum', 'habakkuk', 'zephaniah', 'haggai', 'zechariah', 'malachi',
+    // New Testament figures
+    'mary', 'joseph', 'john', 'peter', 'paul', 'matthew', 'mark', 'luke', 'james', 'andrew', 'philip', 'bartholomew', 'thomas', 'judas', 'simon', 'thaddaeus',
+    'stephen', 'barnabas', 'timothy', 'titus', 'silas', 'apollos', 'priscilla', 'aquila',
+    'pilate', 'herod', 'caesar', 'caiaphas',
+    // Places
+    'israel', 'jerusalem', 'zion', 'bethlehem', 'nazareth', 'galilee', 'judea', 'samaria', 'egypt', 'babylon', 'assyria',
+    'canaan', 'jordan', 'sinai', 'horeb', 'carmel', 'olivet', 'gethsemane', 'calvary', 'golgotha',
+    'eden', 'babel', 'sodom', 'gomorrah', 'jericho', 'damascus', 'nineveh', 'tarsus', 'corinth', 'ephesus', 'rome', 'macedonia', 'athens',
+    // Peoples and groups
+    'israelites', 'hebrews', 'jews', 'gentiles', 'pharisees', 'sadducees', 'levites', 'priests', 'disciples', 'apostles',
+    'philistines', 'egyptians', 'babylonians', 'assyrians', 'romans', 'persians', 'medes',
+  ]);
+
+  // Split text into segments at commas
+  const parts = text.split(/,\s*/);
+
+  // Process each part after a comma (skip the first part)
+  for (let i = 1; i < parts.length; i++) {
+    // Get the first word after the comma
+    const words = parts[i].split(/\s+/);
+    if (words.length > 0 && words[0]) {
+      const firstWord = words[0];
+      const lowerFirstWord = firstWord.toLowerCase();
+
+      // Only lowercase if it's not a priority word
+      if (!PRIORITY_WORDS.has(lowerFirstWord)) {
+        // Replace the first word with lowercase version
+        words[0] = firstWord.charAt(0).toLowerCase() + firstWord.slice(1);
+        parts[i] = words.join(' ');
+      }
+    }
+  }
+
+  return parts.join(', ');
+};
+
 const applyBlanks = (htmlText, blanks) => {
   const raw = (htmlText || '').trim();
   if (!raw) return { blanked: '', answer: '' };
 
   // Parse plain text with NLP, but keep track of original HTML
   const plainText = stripHtml(raw);
-  const doc = typeof nlp !== 'undefined' ? nlp(plainText) : null;
+  const normalizedText = normalizeTextForNlp(plainText);
+  const doc = typeof nlp !== 'undefined' ? nlp(normalizedText) : null;
   const termJson =
     doc && doc.json
       ? doc
@@ -630,11 +681,11 @@ const applyBlanks = (htmlText, blanks) => {
       priority = 4;
     } else if (PRIORITY_WORDS.has(lowerText) || hasTag(t, ['Person', 'Place', 'Organization', 'ProperNoun', 'Date', 'Value', 'Cardinal', 'Ordinal'])) {
       priority = 1;
-    } else if (hasTag(t, ['Noun', 'Verb', 'Adjective', 'Gerund'])) {
+    } else if (hasTag(t, ['Noun', 'Verb', 'Gerund'])) {
       priority = 2;
-    } else if (hasTag(t, ['Interjection', 'Expression'])) {
+    } else if (hasTag(t, ['Interjection', 'Expression', 'Adjective', 'Adverb'])) {
       priority = 3;
-    } else if (hasTag(t, ['Preposition', 'Conjunction', 'Determiner', 'Pronoun', 'StatesofBeingVerbs'])) {
+    } else if (hasTag(t, ['Preposition', 'Conjunction', 'Determiner', 'Pronoun', 'Articles', 'StatesofBeingVerbs'])) {
       priority = 4;
     }
     return { ...t, isPunct, priority };
