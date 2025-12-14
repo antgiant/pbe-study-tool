@@ -18,7 +18,8 @@ const answerTitle = document.getElementById('answer-title');
 const answerReference = document.getElementById('answer-reference');
 const answerText = document.getElementById('answer-text');
 const answerPointsEl = document.getElementById('answer-points');
-const continueButton = document.getElementById('continue-button');
+const answerPrevButton = document.getElementById('answer-prev-button');
+const answerNextButton = document.getElementById('answer-next-button');
 const minBlanksInput = document.getElementById('min-blanks');
 const maxBlanksInput = document.getElementById('max-blanks');
 const blankLimitHint = document.getElementById('blank-limit');
@@ -724,6 +725,7 @@ const showAnswer = () => {
   const pointsValue = questionPointsList[questionIndex];
   answerPointsEl.textContent = `${pointsValue} Points`;
   answerText.innerHTML = questionAnswersList[questionIndex];
+  answerPrevButton.disabled = false;
 };
 
 const goNext = () => {
@@ -747,6 +749,26 @@ const goPrev = () => {
     questionIndex -= 1;
     updateQuestionView();
   }
+};
+
+const goNextFromAnswer = () => {
+  if (!sessionActive || questionOrder.length === 0) return;
+  if (questionIndex < questionOrder.length - 1) {
+    questionIndex += 1;
+  } else {
+    questionOrder = shuffle(appState.activeVerseIds);
+    questionPointsList = questionOrder.map((id) => randomPointsValue(id));
+    const blanksData = questionOrder.map((id, idx) => applyBlanks(appState.verseBank[id]?.text || '', questionPointsList[idx]));
+    questionBlanksList = blanksData.map(data => data.blanked);
+    questionAnswersList = blanksData.map(data => data.answer);
+    questionIndex = 0;
+  }
+  updateQuestionView();
+};
+
+const goPrevFromAnswer = () => {
+  if (!sessionActive || questionOrder.length === 0) return;
+  updateQuestionView();
 };
 
 const toggleChapterSelector = () => {
@@ -787,8 +809,9 @@ selectAll.addEventListener('change', (event) => {
 startButton.addEventListener('click', startSession);
 selectorsToggle.addEventListener('click', () => toggleSelectors());
 nextButton.addEventListener('click', showAnswer);
-continueButton.addEventListener('click', goNext);
 prevButton.addEventListener('click', goPrev);
+answerNextButton.addEventListener('click', goNextFromAnswer);
+answerPrevButton.addEventListener('click', goPrevFromAnswer);
 
 minBlanksInput.addEventListener('input', () => {
   const value = Math.max(1, toInt(minBlanksInput.value, 1));
