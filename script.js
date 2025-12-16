@@ -1,6 +1,5 @@
 const seasonSelect = document.getElementById('year');
 const chapterSelector = document.getElementById('chapter-selector');
-const selectAll = document.getElementById('select-all');
 const optionsContainer = document.getElementById('chapter-options');
 const startButton = document.getElementById('start-button');
 const selectorsContainer = document.getElementById('selectors-container');
@@ -143,6 +142,7 @@ const defaultState = {
 
 let appState = { ...defaultState };
 let chapterOptions = [];
+let bookToggleMap = new Map();
 const downloadsInFlight = new Map();
 let questionOrder = [];
 let questionIndex = 0;
@@ -399,20 +399,20 @@ const updateStartState = () => {
   startButton.disabled = !anySelected || anyDownloads || !allReady || !hasVerses;
 };
 
-const syncSelectAllState = () => {
-  if (chapterOptions.length === 0) {
-    selectAll.checked = false;
-    return;
-  }
-  const allChecked = chapterOptions.every((option) => option.checked);
-  selectAll.checked = allChecked;
+const updateBookToggleStates = () => {
+  bookToggleMap.forEach(({ checkbox, chapters }) => {
+    const total = chapters.length;
+    const checkedCount = chapters.filter((option) => option.checked).length;
+    checkbox.checked = total > 0 && checkedCount === total;
+    checkbox.indeterminate = checkedCount > 0 && checkedCount < total;
+  });
 };
 
 const statusLabelFor = (status) => {
-  if (status === STATUS.DOWNLOADING) return ' (downloading...)';
-  if (status === STATUS.ERROR) return ' ⚠ retry needed';
-  if (status === STATUS.READY) return ' (ready)';
-  return ' (not downloaded)';
+  if (status === STATUS.DOWNLOADING) return '🔄';
+  if (status === STATUS.ERROR) return '⚠️';
+  if (status === STATUS.READY) return '✅';
+  return '☁️';
 };
 
 const toggleSelectors = (forceState) => {
@@ -478,6 +478,7 @@ const renderYearOptions = (selectedYear = '') => {
 
 const renderChapterOptions = (year, selectedValues = new Set()) => {
   optionsContainer.innerHTML = '';
+  bookToggleMap = new Map();
   const selections = chaptersByYear[year] || [];
 
   selections.forEach(({ bookKey, start, end }) => {
@@ -485,37 +486,77 @@ const renderChapterOptions = (year, selectedValues = new Set()) => {
     if (!meta) return;
     const cappedEnd = Math.min(end, meta.totalChapters);
 
+    const group = document.createElement('div');
+    group.className = 'book-group';
+
+    const bookLabel = document.createElement('label');
+    bookLabel.className = 'book-header';
+    const bookCheckbox = document.createElement('input');
+    bookCheckbox.type = 'checkbox';
+    bookCheckbox.className = 'book-checkbox';
+    bookCheckbox.dataset.bookKey = bookKey;
+    const bookName = document.createElement('span');
+    bookName.className = 'book-name';
+    bookName.textContent = meta.label;
+    bookLabel.appendChild(bookCheckbox);
+    bookLabel.appendChild(bookName);
+    group.appendChild(bookLabel);
+
+    const grid = document.createElement('div');
+    grid.className = 'chapter-grid';
+
+    const chapterCheckboxes = [];
+
     for (let chapter = start; chapter <= cappedEnd; chapter += 1) {
       const chapterKey = `${meta.id},${chapter}`;
       const label = document.createElement('label');
+      label.className = 'chapter-check';
+
       const input = document.createElement('input');
       input.type = 'checkbox';
       input.className = 'chapter-option';
       input.value = chapterKey;
       input.checked = selectedValues.has(input.value);
 
-      const textNode = document.createTextNode(` ${meta.label} ${chapter}`);
-      const statusSpan = document.createElement('span');
+      const numberSpan = document.createElement('span');
+      numberSpan.className = 'chapter-number';
+      numberSpan.textContent = chapter;
+
       const status = appState.chapterIndex[chapterKey]?.status || STATUS.NOT_DOWNLOADED;
+      const statusSpan = document.createElement('span');
       statusSpan.className = `chapter-status${status ? ` ${status}` : ''}`;
       statusSpan.textContent = statusLabelFor(status);
 
       label.appendChild(input);
-      label.appendChild(textNode);
+      label.appendChild(numberSpan);
       label.appendChild(statusSpan);
-      optionsContainer.appendChild(label);
+      grid.appendChild(label);
+      chapterCheckboxes.push(input);
     }
+
+    group.appendChild(grid);
+    optionsContainer.appendChild(group);
+    bookToggleMap.set(bookKey, { checkbox: bookCheckbox, chapters: chapterCheckboxes });
   });
 
   chapterOptions = Array.from(optionsContainer.querySelectorAll('.chapter-option'));
   chapterOptions.forEach((option) => {
     option.addEventListener('change', () => {
-      syncSelectAllState();
       handleChapterSelectionChange();
     });
   });
 
-  syncSelectAllState();
+  bookToggleMap.forEach(({ checkbox, chapters }) => {
+    checkbox.addEventListener('change', (event) => {
+      const shouldCheck = event.target.checked;
+      chapters.forEach((chapterOption) => {
+        chapterOption.checked = shouldCheck;
+      });
+      handleChapterSelectionChange();
+    });
+  });
+
+  updateBookToggleStates();
   updateChapterIndicators();
   updateStartState();
 };
@@ -604,7 +645,7 @@ const uncheckChapter = (chapterKey) => {
     }
   });
   appState.activeChapters = appState.activeChapters.filter((key) => key !== chapterKey);
-  syncSelectAllState();
+  updateBookToggleStates();
 };
 
 const fetchChapter = async (chapterKey) => {
@@ -670,6 +711,7 @@ const startDownloadsForSelection = () => {
 
 const handleChapterSelectionChange = () => {
   appState.activeChapters = chapterOptions.filter((option) => option.checked).map((opt) => opt.value);
+  updateBookToggleStates();
   saveState();
   startDownloadsForSelection();
   updateStartState();
@@ -691,13 +733,6 @@ const handleChapterSelectionChange = () => {
     questionIndex = 0;
     updateQuestionView();
   }
-};
-
-const handleSelectAllChange = (checked) => {
-  chapterOptions.forEach((option) => {
-    option.checked = checked;
-  });
-  handleChapterSelectionChange();
 };
 
 const shuffle = (arr) => {
@@ -1225,7 +1260,6 @@ const toggleChapterSelector = () => {
   startButton.style.display = hasSelection ? 'inline-flex' : 'none';
 
   if (!hasSelection) {
-    selectAll.checked = false;
     renderChapterOptions(null, new Set());
     startButton.disabled = true;
     // Clear active selections but preserve downloaded data
@@ -1245,10 +1279,6 @@ const toggleChapterSelector = () => {
 
 seasonSelect.addEventListener('change', () => {
   toggleChapterSelector();
-});
-
-selectAll.addEventListener('change', (event) => {
-  handleSelectAllChange(event.target.checked);
 });
 
 startButton.addEventListener('click', startSession);

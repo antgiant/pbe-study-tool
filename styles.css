@@ -103,6 +103,51 @@ button:disabled {
   background: rgba(255, 255, 255, 0.04);
 }
 
+.book-group {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.book-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+
+.book-header input {
+  margin: 0;
+}
+
+.chapter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+  gap: 8px;
+}
+
+.chapter-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  font-weight: 600;
+}
+
+.chapter-check input {
+  margin: 0;
+}
+
+.chapter-number {
+  font-weight: 700;
+}
+
 .accordion-toggle {
   width: 100%;
   background: transparent;
@@ -198,7 +243,7 @@ button:disabled {
 }
 
 .chapter-status {
-  margin-left: 6px;
+  margin-left: auto;
   font-size: 12px;
   color: #d6e2f7;
   opacity: 0.85;
