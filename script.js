@@ -459,9 +459,6 @@ const updateChapterIndicators = () => {
 
 const renderYearOptions = (selectedYear = '') => {
   seasonSelect.innerHTML = '';
-  const emptyOption = document.createElement('option');
-  emptyOption.value = '';
-  seasonSelect.appendChild(emptyOption);
 
   Object.keys(chaptersByYear).forEach((yearKey) => {
     const option = document.createElement('option');
