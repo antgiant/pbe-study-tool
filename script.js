@@ -360,18 +360,29 @@ const computeMaxWordsInActiveSelection = () => {
 
 const updateBlankInputs = () => {
   const maxWords = computeMaxWordsInActiveSelection();
-  const maxVal = Math.max(1, Math.min(toInt(appState.maxBlanks, maxWords), maxWords));
-  const minVal = Math.max(1, Math.min(toInt(appState.minBlanks, 1), maxVal));
   const percentVal = Math.max(1, Math.min(toInt(appState.maxBlankPercentage, 100), 100));
+  const percentCap = Math.max(1, Math.floor((percentVal / 100) * maxWords));
+  const allowedMax = Math.min(maxWords, percentCap);
+
+  let maxVal = Math.max(1, Math.min(toInt(appState.maxBlanks, maxWords), allowedMax));
+  let minVal = Math.max(1, toInt(appState.minBlanks, 1));
+
+  // If min surpasses max, lift max up to min (capped by allowed maximum)
+  if (minVal > maxVal) {
+    maxVal = Math.min(minVal, allowedMax);
+  }
+
+  // After lifting max, ensure min does not exceed it
+  minVal = Math.min(minVal, maxVal);
 
   appState.minBlanks = minVal;
   appState.maxBlanks = maxVal;
   appState.maxBlankPercentage = percentVal;
 
   minBlanksInput.min = 1;
-  minBlanksInput.max = maxVal;
+  minBlanksInput.max = allowedMax;
   maxBlanksInput.min = 1;
-  maxBlanksInput.max = maxWords;
+  maxBlanksInput.max = allowedMax;
   maxBlankPercentageInput.min = 1;
   maxBlankPercentageInput.max = 100;
 
@@ -379,8 +390,7 @@ const updateBlankInputs = () => {
   maxBlanksInput.value = appState.maxBlanks;
   maxBlankPercentageInput.value = appState.maxBlankPercentage;
 
-  const percentCap = Math.max(1, Math.floor((appState.maxBlankPercentage / 100) * maxWords));
-  blankLimitHint.textContent = `Min can go up to current max (${maxVal}); max allowed is ${Math.min(maxWords, percentCap)} based on selected verses and ${appState.maxBlankPercentage}% cap.`;
+  blankLimitHint.textContent = `Min can go up to current max (${maxVal}); max allowed is ${allowedMax} based on selected verses and ${appState.maxBlankPercentage}% cap.`;
   saveState();
 };
 
@@ -1289,16 +1299,19 @@ hintButton.addEventListener('click', revealHint);
 answerNextButton.addEventListener('click', goNextFromAnswer);
 answerPrevButton.addEventListener('click', goPrevFromAnswer);
 
-minBlanksInput.addEventListener('input', () => {
+const handleMinBlanksChange = () => {
+  if (minBlanksInput.value === '') return; // allow clearing before entering a new number
   const value = Math.max(1, toInt(minBlanksInput.value, 1));
   appState.minBlanks = value;
+  const maxWords = computeMaxWordsInActiveSelection();
   if (appState.maxBlanks < value) {
-    appState.maxBlanks = value;
+    appState.maxBlanks = Math.min(value, maxWords);
   }
   updateBlankInputs();
-});
+};
 
-maxBlanksInput.addEventListener('input', () => {
+const handleMaxBlanksChange = () => {
+  if (maxBlanksInput.value === '') return; // allow clearing before entering a new number
   const value = Math.max(1, toInt(maxBlanksInput.value, 1));
   const maxWords = computeMaxWordsInActiveSelection();
   appState.maxBlanks = Math.min(value, maxWords);
@@ -1306,12 +1319,26 @@ maxBlanksInput.addEventListener('input', () => {
     appState.minBlanks = appState.maxBlanks;
   }
   updateBlankInputs();
-});
+};
 
-maxBlankPercentageInput.addEventListener('input', () => {
+const handleMaxPercentChange = () => {
+  if (maxBlankPercentageInput.value === '') return; // allow clearing before entering a new number
   const value = Math.max(1, toInt(maxBlankPercentageInput.value, 100));
   appState.maxBlankPercentage = Math.min(value, 100);
   updateBlankInputs();
+};
+
+['input', 'change'].forEach((evt) => {
+  minBlanksInput.addEventListener(evt, handleMinBlanksChange);
+  maxBlanksInput.addEventListener(evt, handleMaxBlanksChange);
+  maxBlankPercentageInput.addEventListener(evt, handleMaxPercentChange);
+});
+
+// Normalize blank fields on blur so typing isn't interrupted by live validation
+[minBlanksInput, maxBlanksInput, maxBlankPercentageInput].forEach((input) => {
+  input.addEventListener('blur', () => {
+    updateBlankInputs();
+  });
 });
 
 const initialState = loadState();
