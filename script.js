@@ -403,7 +403,7 @@ const updateBlankInputs = () => {
   maxBlanksInput.value = appState.maxBlanks;
   maxBlankPercentageInput.value = appState.maxBlankPercentage;
 
-  blankLimitHint.textContent = `Min can go up to current max (${maxVal}); max allowed is ${allowedMax} based on selected verses and ${appState.maxBlankPercentage}% cap.`;
+  blankLimitHint.textContent = `max allowed is ${allowedMax} based on selected verses and ${appState.maxBlankPercentage}% cap.`;
   saveState();
 };
 
