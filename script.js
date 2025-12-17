@@ -42,8 +42,8 @@ const STATE_OF_BEING_WORDS = ['am', 'is', 'are', 'was', 'were', 'be', 'being', '
 const TFIDF_CONFIG = {
   verseWeight: 0.6,        // How much to weight verse-level TF-IDF
   chapterWeight: 0.4,      // How much to weight chapter-level TF-IDF
-  tfidfWeight: 0.5,        // How much TF-IDF influences final score
-  priorityWeight: 0.5,     // How much priority influences final score
+  tfidfWeight: 0.3,        // How much TF-IDF influences final score
+  priorityWeight: 0.7,     // How much priority influences final score
   minWordLength: 2,        // Ignore very short words in TF-IDF
 };
 const FULL_BIBLE_KEY = 'custom-all';
@@ -2122,25 +2122,27 @@ const applyBlanks = (htmlText, blanks, verseId) => {
   // Sort candidates by finalScore (descending - higher score = more important)
   const sortedCandidates = [...candidates].sort((a, b) => b.finalScore - a.finalScore);
 
-  // Select top N candidates
-  const chosen = new Set();
+  // Calculate target number of blanks
   const target = Math.min(maxBlanksAllowed, candidates.length);
-  sortedCandidates.slice(0, target).forEach((c) => chosen.add(c.idx));
 
-  // Build a set of plain text words to blank
-  const wordsToBlank = new Set(
-    Array.from(chosen).map(idx => termsWithPriority[idx]?.text?.toLowerCase()).filter(Boolean)
-  );
+  // Select a larger pool of candidate words (up to 2x target or all candidates)
+  // This gives us more words to choose from when we have duplicates
+  const poolSize = Math.min(target * 2, candidates.length);
+  const wordsInPriorityOrder = sortedCandidates
+    .slice(0, poolSize)
+    .map(c => termsWithPriority[c.idx]?.text?.toLowerCase())
+    .filter(Boolean);
 
   // Replace words in the original HTML, preserving tags
-  // First, find all matches in order of appearance
-  const matchesInOrder = [];
-  wordsToBlank.forEach(word => {
+  // First, find all matches grouped by word
+  const matchesByWord = new Map();
+  wordsInPriorityOrder.forEach(word => {
     const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const regex = new RegExp(`\\b${escapedWord}\\b`, 'ig');
     let match;
+    const matches = [];
     while ((match = regex.exec(raw)) !== null) {
-      matchesInOrder.push({
+      matches.push({
         word: match[0],
         index: match.index,
         lowerWord: word
@@ -2150,22 +2152,48 @@ const applyBlanks = (htmlText, blanks, verseId) => {
         regex.lastIndex++;
       }
     }
+    if (matches.length > 0) {
+      matchesByWord.set(word, matches);
+    }
   });
 
-  // Sort by position in text to get order of appearance
-  matchesInOrder.sort((a, b) => a.index - b.index);
-
-  // Take only the target number of matches and track which lowercase words we're using
-  const usedWords = new Set();
-  const blanksToApply = [];
-  for (const match of matchesInOrder) {
-    if (blanksToApply.length >= target) break;
-    // Only use each unique word once (first occurrence)
-    if (!usedWords.has(match.lowerWord)) {
-      blanksToApply.push(match);
-      usedWords.add(match.lowerWord);
+  // Now select blanks in priority order, randomly choosing occurrences
+  // Shuffle occurrences for each word once
+  const shuffledOccurrencesByWord = new Map();
+  wordsInPriorityOrder.forEach(word => {
+    const occurrences = matchesByWord.get(word);
+    if (occurrences && occurrences.length > 0) {
+      shuffledOccurrencesByWord.set(word, [...occurrences].sort(() => Math.random() - 0.5));
     }
+  });
+
+  // Select blanks round-robin: one occurrence from each word in priority order
+  const blanksToApply = [];
+  let blanksRemaining = target;
+  let round = 0;
+
+  while (blanksRemaining > 0) {
+    let addedThisRound = false;
+
+    for (const word of wordsInPriorityOrder) {
+      if (blanksRemaining <= 0) break;
+
+      const occurrences = shuffledOccurrencesByWord.get(word);
+      if (!occurrences || round >= occurrences.length) continue;
+
+      // Take one occurrence from this word for this round
+      blanksToApply.push(occurrences[round]);
+      blanksRemaining--;
+      addedThisRound = true;
+    }
+
+    // If we didn't add any blanks this round, we've exhausted all words
+    if (!addedThisRound) break;
+    round++;
   }
+
+  // Sort by position in text to apply in order
+  blanksToApply.sort((a, b) => a.index - b.index);
 
   // Apply blanks in order and collect the blanked words
   let blankedResult = '';
