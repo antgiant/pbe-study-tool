@@ -48,15 +48,33 @@ const TFIDF_CONFIG = {
 const FULL_BIBLE_KEY = 'custom-all';
 let storageWritable = true;
 
-const buildPersistableState = () => {
-  const lightChapterIndex = {};
+const buildPersistableState = (includeVerses = true) => {
+  const chapterIndex = {};
+  const verseBank = {};
+  const allowedChapters = new Set();
+
   Object.entries(appState.chapterIndex || {}).forEach(([key, entry]) => {
     if (!entry) return;
-    lightChapterIndex[key] = {
-      status: entry.verseIds?.length ? entry.status : STATUS.NOT_DOWNLOADED,
+    const hasVerses = includeVerses && entry.verseIds?.length;
+    chapterIndex[key] = {
+      status: hasVerses ? entry.status : STATUS.NOT_DOWNLOADED,
       lastUpdated: entry.lastUpdated,
+      verseIds: hasVerses ? entry.verseIds : undefined,
     };
+    if (hasVerses) {
+      allowedChapters.add(key);
+    }
   });
+
+  if (includeVerses) {
+    Object.entries(appState.verseBank || {}).forEach(([id, verse]) => {
+      const chapterKey = `${verse.bookId},${verse.chapter}`;
+      if (allowedChapters.has(chapterKey)) {
+        verseBank[id] = verse;
+      }
+    });
+  }
+
   return {
     version: STATE_VERSION,
     year: appState.year,
@@ -65,7 +83,8 @@ const buildPersistableState = () => {
     verseSelections: appState.verseSelections,
     chapterVerseCounts: appState.chapterVerseCounts,
     activeSelector: appState.activeSelector,
-    chapterIndex: lightChapterIndex,
+    chapterIndex,
+    verseBank: includeVerses ? verseBank : {},
     minBlanks: appState.minBlanks,
     maxBlanks: appState.maxBlanks,
     maxBlankPercentage: appState.maxBlankPercentage,
@@ -687,12 +706,19 @@ const loadState = () => {
 const saveState = () => {
   if (!storageWritable) return;
   try {
-    const persistable = buildPersistableState();
+    const persistable = buildPersistableState(true);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(persistable));
   } catch (err) {
     if (err && err.name === 'QuotaExceededError') {
-      storageWritable = false;
-      console.warn('Unable to save settings - storage quota exceeded; further saves disabled');
+      // Retry with a minimal state (no verse text) so at least selections persist
+      try {
+        const minimal = buildPersistableState(false);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(minimal));
+        console.warn('Saved settings without downloaded verses due to quota limits');
+      } catch (innerErr) {
+        storageWritable = false;
+        console.warn('Unable to save settings - storage quota exceeded; further saves disabled');
+      }
     } else {
       console.warn('Unable to save settings', err);
     }
