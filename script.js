@@ -49,6 +49,87 @@ const TFIDF_CONFIG = {
 const FULL_BIBLE_KEY = 'custom-all';
 let storageWritable = true;
 
+// IndexedDB Configuration
+const DB_NAME = 'PBEDatabase';
+const DB_VERSION = 1;
+const STORE_NAME = 'appState';
+const STATE_KEY = 'currentState';
+
+// IndexedDB Helper Functions
+const openDatabase = () => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    };
+  });
+};
+
+const getFromIndexedDB = async (key) => {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_NAME], 'readonly');
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.get(key);
+
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.warn('IndexedDB get error:', err);
+    return null;
+  }
+};
+
+const setToIndexedDB = async (key, value) => {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_NAME], 'readwrite');
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.put(value, key);
+
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.warn('IndexedDB set error:', err);
+    throw err;
+  }
+};
+
+const migrateFromLocalStorage = async () => {
+  try {
+    // Check if we have data in localStorage
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    console.log('Migrating data from localStorage to IndexedDB...');
+
+    // Save to IndexedDB
+    await setToIndexedDB(STATE_KEY, parsed);
+
+    // Clear localStorage after successful migration
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(SELECTIONS_KEY);
+
+    console.log('Migration complete!');
+    return parsed;
+  } catch (err) {
+    console.warn('Migration from localStorage failed:', err);
+    return null;
+  }
+};
+
 const buildPersistableState = (includeVerses = true) => {
   const chapterIndex = {};
   const verseBank = {};
@@ -660,28 +741,20 @@ const migrateTFIDFData = (state) => {
   return state;
 };
 
-const loadState = () => {
+const loadState = async () => {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const selectionRaw = localStorage.getItem(SELECTIONS_KEY);
-    let selectionData = null;
-    if (selectionRaw) {
-      try {
-        selectionData = JSON.parse(selectionRaw);
-      } catch (e) {
-        selectionData = null;
-      }
+    // Try to load from IndexedDB first
+    let parsed = await getFromIndexedDB(STATE_KEY);
+
+    // If not in IndexedDB, try migrating from localStorage
+    if (!parsed) {
+      parsed = await migrateFromLocalStorage();
     }
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
+
+    if (!parsed) return null;
+
     if (parsed.version === STATE_VERSION) {
       const normalized = { ...defaultState, ...parsed };
-      if (selectionData?.verseSelections) {
-        normalized.verseSelections = selectionData.verseSelections;
-      }
-      if (selectionData?.activeChapters) {
-        normalized.activeChapters = selectionData.activeChapters;
-      }
       if (!normalized.verseSelections || typeof normalized.verseSelections !== 'object') {
         normalized.verseSelections = {};
       }
@@ -723,38 +796,17 @@ const loadState = () => {
   }
 };
 
-const saveState = () => {
+const saveState = async () => {
   if (!storageWritable) return;
   try {
     const persistable = buildPersistableState(true);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(persistable));
-    localStorage.setItem(
-      SELECTIONS_KEY,
-      JSON.stringify({
-        verseSelections: appState.verseSelections,
-        activeChapters: appState.activeChapters,
-      })
-    );
+    await setToIndexedDB(STATE_KEY, persistable);
   } catch (err) {
-    if (err && err.name === 'QuotaExceededError') {
-      // Retry with a minimal state (no verse text) so at least selections persist
-      try {
-        const minimal = buildPersistableState(false);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(minimal));
-        localStorage.setItem(
-          SELECTIONS_KEY,
-          JSON.stringify({
-            verseSelections: appState.verseSelections,
-            activeChapters: appState.activeChapters,
-          })
-        );
-        console.warn('Saved settings without downloaded verses due to quota limits');
-      } catch (innerErr) {
-        storageWritable = false;
-        console.warn('Unable to save settings - storage quota exceeded; further saves disabled');
-      }
-    } else {
-      console.warn('Unable to save settings', err);
+    console.warn('Unable to save settings to IndexedDB', err);
+    // IndexedDB rarely has quota issues, but if it fails, disable further saves
+    if (err.name === 'QuotaExceededError') {
+      storageWritable = false;
+      console.warn('Storage quota exceeded; further saves disabled');
     }
   }
 };
@@ -2495,24 +2547,27 @@ const handleMaxPercentChange = (evt) => {
   });
 });
 
-const initialState = loadState();
-if (initialState) {
-  appState = initialState;
-  // Save the migrated state back to localStorage
-  saveState();
-}
+// Initialize app with async state loading
+(async () => {
+  const initialState = await loadState();
+  if (initialState) {
+    appState = initialState;
+    // Save the migrated state back to IndexedDB
+    await saveState();
+  }
 
-// Apply default year for new users if no year is selected
-if (!appState.year && chaptersByYear.defaultYear) {
-  appState.year = chaptersByYear.defaultYear;
-}
+  // Apply default year for new users if no year is selected
+  if (!appState.year && chaptersByYear.defaultYear) {
+    appState.year = chaptersByYear.defaultYear;
+  }
 
-activeSelector = appState.activeSelector === 'verse' ? 'verse' : 'chapter';
-renderYearOptions(appState.year);
-if (appState.year) {
-  seasonSelect.value = appState.year;
-}
+  activeSelector = appState.activeSelector === 'verse' ? 'verse' : 'chapter';
+  renderYearOptions(appState.year);
+  if (appState.year) {
+    seasonSelect.value = appState.year;
+  }
 
-installCompromisePlugin();
-toggleChapterSelector();
-requestPersistentStorage();
+  installCompromisePlugin();
+  toggleChapterSelector();
+  requestPersistentStorage();
+})();
