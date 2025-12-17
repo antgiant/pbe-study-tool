@@ -1785,17 +1785,17 @@ const handleChapterSelectionChange = () => {
 };
 
 const handleVerseSelectionChange = (changedChapterKey = null, changedBookKey = null) => {
-  const selectedFromChapters = chapterOptions.filter((option) => option.checked).map((opt) => opt.value);
+  // In verse selector mode, use verseSelections as the source of truth
   const verseSelectedChapters = Object.entries(appState.verseSelections || {})
     .filter(([, selection]) => hasVerseSelection(selection))
     .map(([chapterKey]) => chapterKey);
 
-  const combined = Array.from(new Set([...selectedFromChapters, ...verseSelectedChapters]));
-  appState.activeChapters = combined;
+  appState.activeChapters = verseSelectedChapters;
 
+  // Clean up any verse selections that have no actual selection
   Object.keys(appState.verseSelections || {}).forEach((chapterKey) => {
     const selection = appState.verseSelections[chapterKey];
-    if (!combined.includes(chapterKey) || !hasVerseSelection(selection)) {
+    if (!hasVerseSelection(selection)) {
       delete appState.verseSelections[chapterKey];
     }
   });
