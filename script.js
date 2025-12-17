@@ -434,7 +434,7 @@ const updateBookToggleStates = () => {
 const statusLabelFor = (status) => {
   if (status === STATUS.DOWNLOADING) return '🔄';
   if (status === STATUS.ERROR) return '⚠️';
-  if (status === STATUS.READY) return '✅';
+  if (status === STATUS.READY) return '';
   return '☁️';
 };
 
