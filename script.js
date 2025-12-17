@@ -41,6 +41,7 @@ const TFIDF_CONFIG = {
   priorityWeight: 0.5,     // How much priority influences final score
   minWordLength: 2,        // Ignore very short words in TF-IDF
 };
+const FULL_BIBLE_KEY = 'custom-all';
 
 const books = {
   genesis: { id: 1, totalChapters: 50, label: 'Genesis' },
@@ -122,6 +123,18 @@ const chaptersByYear = {
     { bookKey: '3john', start: 1, end: 1 },
   ],
   '2027-2028': [{ bookKey: 'isaiah', start: 34, end: 66 }],
+};
+
+const buildFullBibleSelections = () =>
+  Object.keys(books).map((bookKey) => ({
+    bookKey,
+    start: 1,
+    end: books[bookKey].totalChapters,
+  }));
+
+const getSelectionsForYear = (year) => {
+  if (year === FULL_BIBLE_KEY) return buildFullBibleSelections();
+  return chaptersByYear[year] || [];
 };
 
 const defaultState = {
@@ -460,10 +473,12 @@ const updateChapterIndicators = () => {
 const renderYearOptions = (selectedYear = '') => {
   seasonSelect.innerHTML = '';
 
-  Object.keys(chaptersByYear).forEach((yearKey) => {
+  const yearKeys = Object.keys(chaptersByYear);
+
+  yearKeys.forEach((yearKey) => {
     const option = document.createElement('option');
     option.value = yearKey;
-    const parts = (chaptersByYear[yearKey] || [])
+    const parts = (getSelectionsForYear(yearKey) || [])
       .map(({ bookKey, start, end }) => {
         const meta = books[bookKey];
         if (!meta) return null;
@@ -481,12 +496,18 @@ const renderYearOptions = (selectedYear = '') => {
     option.selected = selectedYear === yearKey;
     seasonSelect.appendChild(option);
   });
+
+  const customOption = document.createElement('option');
+  customOption.value = FULL_BIBLE_KEY;
+  customOption.textContent = 'Custom - Entire Bible';
+  customOption.selected = selectedYear === FULL_BIBLE_KEY;
+  seasonSelect.appendChild(customOption);
 };
 
 const renderChapterOptions = (year, selectedValues = new Set()) => {
   optionsContainer.innerHTML = '';
   bookToggleMap = new Map();
-  const selections = chaptersByYear[year] || [];
+  const selections = getSelectionsForYear(year);
 
   selections.forEach(({ bookKey, start, end }) => {
     const meta = books[bookKey];
