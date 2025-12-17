@@ -918,16 +918,14 @@ const updateBlankInputs = () => {
   const percentCap = Math.max(1, Math.floor((percentVal / 100) * maxWords));
   const allowedMax = Math.min(maxWords, percentCap);
 
-  let maxVal = Math.max(1, Math.min(toInt(appState.maxBlanks, maxWords), allowedMax));
+  let maxVal = Math.max(1, Math.min(toInt(appState.maxBlanks, 1), allowedMax));
   let minVal = Math.max(1, toInt(appState.minBlanks, 1));
 
-  // If min surpasses max, lift max up to min (capped by allowed maximum)
+  // Only adjust min down if it exceeds the constrained max value
+  // Don't try to lift max up - respect what the user typed
   if (minVal > maxVal) {
-    maxVal = Math.min(minVal, allowedMax);
+    minVal = maxVal;
   }
-
-  // After lifting max, ensure min does not exceed it
-  minVal = Math.min(minVal, maxVal);
 
   appState.minBlanks = minVal;
   appState.maxBlanks = maxVal;
@@ -2416,33 +2414,45 @@ toggleToChapterLink.addEventListener('click', (event) => {
   showSelectorView('chapter');
 });
 
-const handleMinBlanksChange = () => {
+const handleMinBlanksChange = (evt) => {
   if (minBlanksInput.value === '') return; // allow clearing before entering a new number
   const value = Math.max(1, toInt(minBlanksInput.value, 1));
   appState.minBlanks = value;
   const maxWords = computeMaxWordsInActiveSelection();
+  const percentVal = Math.max(1, Math.min(toInt(appState.maxBlankPercentage, 100), 100));
+  const percentCap = Math.max(1, Math.floor((percentVal / 100) * maxWords));
+  const allowedMax = Math.min(maxWords, percentCap);
   if (appState.maxBlanks < value) {
-    appState.maxBlanks = Math.min(value, maxWords);
+    appState.maxBlanks = Math.min(value, allowedMax);
   }
-  updateBlankInputs();
+  // Only update UI if this is not an 'input' event (i.e., user is still typing)
+  if (evt.type !== 'input') {
+    updateBlankInputs();
+  }
 };
 
-const handleMaxBlanksChange = () => {
+const handleMaxBlanksChange = (evt) => {
   if (maxBlanksInput.value === '') return; // allow clearing before entering a new number
   const value = Math.max(1, toInt(maxBlanksInput.value, 1));
   const maxWords = computeMaxWordsInActiveSelection();
-  appState.maxBlanks = Math.min(value, maxWords);
-  if (appState.maxBlanks < appState.minBlanks) {
-    appState.minBlanks = appState.maxBlanks;
+  const percentVal = Math.max(1, Math.min(toInt(appState.maxBlankPercentage, 100), 100));
+  const percentCap = Math.max(1, Math.floor((percentVal / 100) * maxWords));
+  const allowedMax = Math.min(maxWords, percentCap);
+  appState.maxBlanks = Math.min(value, allowedMax);
+  // Only update UI if this is not an 'input' event (i.e., user is still typing)
+  if (evt.type !== 'input') {
+    updateBlankInputs();
   }
-  updateBlankInputs();
 };
 
-const handleMaxPercentChange = () => {
+const handleMaxPercentChange = (evt) => {
   if (maxBlankPercentageInput.value === '') return; // allow clearing before entering a new number
   const value = Math.max(1, toInt(maxBlankPercentageInput.value, 100));
   appState.maxBlankPercentage = Math.min(value, 100);
-  updateBlankInputs();
+  // Only update UI if this is not an 'input' event (i.e., user is still typing)
+  if (evt.type !== 'input') {
+    updateBlankInputs();
+  }
 };
 
 ['input', 'change'].forEach((evt) => {
