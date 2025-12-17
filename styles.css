@@ -54,6 +54,25 @@ legend {
   font-weight: 700;
 }
 
+.fieldset-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.selector-toggle {
+  font-size: 13px;
+  color: #fbd38d;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.selector-toggle:hover {
+  text-decoration: underline;
+}
+
 select {
   width: 100%;
   padding: 10px 12px;
@@ -126,6 +145,25 @@ button:disabled {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
   gap: 8px;
+}
+
+.chapter-with-verses {
+  margin-bottom: 10px;
+}
+
+.chapter-header {
+  margin-bottom: 6px;
+}
+
+.verse-grid {
+  margin-top: 6px;
+}
+
+.verse-placeholder {
+  padding: 6px 8px;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .chapter-check {

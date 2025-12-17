@@ -21,8 +21,18 @@
           </select>
         </fieldset>
         <fieldset id="chapter-selector" style="display: none;">
-          <legend>Chapter selector</legend>
+          <legend class="fieldset-header">
+            <span>Chapter selector</span>
+            <a href="#" id="toggle-to-verse" class="selector-toggle">Verse selector</a>
+          </legend>
           <div id="chapter-options"></div>
+        </fieldset>
+        <fieldset id="verse-selector" style="display: none;">
+          <legend class="fieldset-header">
+            <span>Verse selector</span>
+            <a href="#" id="toggle-to-chapter" class="selector-toggle">Chapter selector</a>
+          </legend>
+          <div id="verse-options"></div>
         </fieldset>
         <fieldset id="blank-selector">
           <legend>Blanks</legend>
