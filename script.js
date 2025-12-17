@@ -569,6 +569,7 @@ let chapterOptions = [];
 let bookToggleMap = new Map();
 let verseBookToggleMap = new Map();
 let verseChapterToggleMap = new Map();
+const verseChapterToBook = new Map();
 const downloadsInFlight = new Map();
 let questionOrder = [];
 let questionIndex = 0;
@@ -1044,6 +1045,7 @@ const renderVerseOptions = (year, selectedValues = new Set()) => {
   verseOptionsContainer.innerHTML = '';
   verseBookToggleMap = new Map();
   verseChapterToggleMap = new Map();
+  verseChapterToBook.clear();
 
   if (!year) {
     verseOptionsContainer.innerHTML = '<div class="hint">Select a season to choose verses.</div>';
@@ -1161,8 +1163,9 @@ const renderVerseOptions = (year, selectedValues = new Set()) => {
               selectionEntry.allSelected = false;
               selectionEntry.selectedVerses = Array.from(set);
             }
-            handleVerseSelectionChange();
-            updateVerseToggleStates();
+            handleVerseSelectionChange(chapterKey, bookKey);
+            updateChapterToggleState(chapterKey);
+            updateBookToggleState(bookKey);
           });
         });
       }
@@ -1179,8 +1182,9 @@ const renderVerseOptions = (year, selectedValues = new Set()) => {
         verseCheckboxes.forEach(({ input }) => {
           input.checked = event.target.checked;
         });
-        handleVerseSelectionChange();
-        updateVerseToggleStates();
+        handleVerseSelectionChange(chapterKey, bookKey);
+        updateChapterToggleState(chapterKey);
+        updateBookToggleState(bookKey);
       });
 
       const chapterEntry = {
@@ -1190,8 +1194,10 @@ const renderVerseOptions = (year, selectedValues = new Set()) => {
         statusSpan,
         verseNumbers,
         chapterKey,
+        bookKey,
       };
       verseChapterToggleMap.set(chapterKey, chapterEntry);
+      verseChapterToBook.set(chapterKey, bookKey);
       bookChapters.push(chapterEntry);
     }
 
@@ -1215,8 +1221,11 @@ const renderVerseOptions = (year, selectedValues = new Set()) => {
           });
         }
       });
-      handleVerseSelectionChange();
-      updateVerseToggleStates();
+      handleVerseSelectionChange(null, bookKey);
+      bookChapters.forEach(({ chapterKey }) => {
+        updateChapterToggleState(chapterKey);
+      });
+      updateBookToggleState(bookKey);
     });
 
     verseOptionsContainer.appendChild(group);
@@ -1265,6 +1274,31 @@ const updateVerseIndicators = () => {
       });
     }
   });
+};
+
+const updateChapterToggleState = (chapterKey) => {
+  const entry = verseChapterToggleMap.get(chapterKey);
+  if (!entry) return;
+  const { chapterCheckbox, verseCheckboxes } = entry;
+  const selection = appState.verseSelections?.[chapterKey];
+  const allSelected = selection?.allSelected;
+  const totalVerses = verseCheckboxes.length;
+  const checkedVerses = verseCheckboxes.filter((v) => v.input.checked).length;
+  if (chapterCheckbox) {
+    chapterCheckbox.checked = allSelected || (totalVerses > 0 && checkedVerses > 0 && checkedVerses === totalVerses);
+    chapterCheckbox.indeterminate = !chapterCheckbox.checked && checkedVerses > 0;
+  }
+};
+
+const updateBookToggleState = (bookKey) => {
+  const entry = verseBookToggleMap.get(bookKey);
+  if (!entry) return;
+  const { checkbox, chapters } = entry;
+  const total = chapters.length;
+  const checkedCount = chapters.filter(({ chapterCheckbox }) => chapterCheckbox?.checked).length;
+  const hasPartial = chapters.some(({ chapterCheckbox }) => chapterCheckbox?.indeterminate);
+  checkbox.checked = total > 0 && checkedCount === total;
+  checkbox.indeterminate = !checkbox.checked && (checkedCount > 0 || hasPartial);
 };
 
 const getChapterMeta = (chapterKey) => {
@@ -1490,7 +1524,7 @@ const handleChapterSelectionChange = () => {
   }
 };
 
-const handleVerseSelectionChange = () => {
+const handleVerseSelectionChange = (changedChapterKey = null, changedBookKey = null) => {
   const selectedFromChapters = chapterOptions.filter((option) => option.checked).map((opt) => opt.value);
   const verseSelectedChapters = Object.entries(appState.verseSelections || {})
     .filter(([, selection]) => hasVerseSelection(selection))
@@ -1511,8 +1545,13 @@ const handleVerseSelectionChange = () => {
   recomputeActiveVerseIds();
   updateStartState();
   updateBookToggleStates();
-  updateVerseToggleStates();
-  updateVerseIndicators();
+  if (changedChapterKey) {
+    updateChapterToggleState(changedChapterKey);
+    const bookKey = changedBookKey || verseChapterToBook.get(changedChapterKey);
+    if (bookKey) updateBookToggleState(bookKey);
+  } else if (changedBookKey) {
+    updateBookToggleState(changedBookKey);
+  }
 };
 
 const shuffle = (arr) => {
