@@ -569,6 +569,7 @@ const books = {
 };
 
 const chaptersByYear = {
+  defaultYear: '2025-2026', // Default selection for new users
   '2025-2026': [{ bookKey: 'isaiah', start: 1, end: 33 }],
   '2026-2027': [
     { bookKey: 'mark', start: 1, end: 16 },
@@ -1013,7 +1014,7 @@ const updateChapterIndicators = () => {
 const renderYearOptions = (selectedYear = '') => {
   seasonSelect.innerHTML = '';
 
-  const yearKeys = Object.keys(chaptersByYear);
+  const yearKeys = Object.keys(chaptersByYear).filter(key => key !== 'defaultYear');
 
   yearKeys.forEach((yearKey) => {
     const option = document.createElement('option');
@@ -2500,6 +2501,12 @@ if (initialState) {
   // Save the migrated state back to localStorage
   saveState();
 }
+
+// Apply default year for new users if no year is selected
+if (!appState.year && chaptersByYear.defaultYear) {
+  appState.year = chaptersByYear.defaultYear;
+}
+
 activeSelector = appState.activeSelector === 'verse' ? 'verse' : 'chapter';
 renderYearOptions(appState.year);
 if (appState.year) {
