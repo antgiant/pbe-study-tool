@@ -46,6 +46,31 @@ const TFIDF_CONFIG = {
   minWordLength: 2,        // Ignore very short words in TF-IDF
 };
 const FULL_BIBLE_KEY = 'custom-all';
+let storageWritable = true;
+
+const buildPersistableState = () => {
+  const lightChapterIndex = {};
+  Object.entries(appState.chapterIndex || {}).forEach(([key, entry]) => {
+    if (!entry) return;
+    lightChapterIndex[key] = {
+      status: entry.verseIds?.length ? entry.status : STATUS.NOT_DOWNLOADED,
+      lastUpdated: entry.lastUpdated,
+    };
+  });
+  return {
+    version: STATE_VERSION,
+    year: appState.year,
+    activeChapters: appState.activeChapters,
+    activeVerseIds: [], // force recompute on load
+    verseSelections: appState.verseSelections,
+    chapterVerseCounts: appState.chapterVerseCounts,
+    activeSelector: appState.activeSelector,
+    chapterIndex: lightChapterIndex,
+    minBlanks: appState.minBlanks,
+    maxBlanks: appState.maxBlanks,
+    maxBlankPercentage: appState.maxBlankPercentage,
+  };
+};
 
 const books = {
   genesis: {
@@ -635,6 +660,9 @@ const loadState = () => {
         }
         if (entry.verseIds?.length) {
           normalized.chapterVerseCounts[key] = entry.verseIds.length;
+        } else if (entry.status === STATUS.READY) {
+          // If we persisted a READY flag without verseIds, force a fresh download
+          entry.status = STATUS.NOT_DOWNLOADED;
         }
       });
       // Migrate old verses to include TF-IDF data
@@ -657,10 +685,17 @@ const loadState = () => {
 };
 
 const saveState = () => {
+  if (!storageWritable) return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+    const persistable = buildPersistableState();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(persistable));
   } catch (err) {
-    console.warn('Unable to save settings', err);
+    if (err && err.name === 'QuotaExceededError') {
+      storageWritable = false;
+      console.warn('Unable to save settings - storage quota exceeded; further saves disabled');
+    } else {
+      console.warn('Unable to save settings', err);
+    }
   }
 };
 const recomputeActiveVerseIds = () => {
