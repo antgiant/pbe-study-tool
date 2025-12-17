@@ -763,17 +763,25 @@ const recomputeActiveVerseIds = () => {
     const entry = appState.chapterIndex[chapterKey];
     if (entry && entry.status === STATUS.READY && entry.verseIds?.length) {
       const selection = appState.verseSelections?.[chapterKey];
-      const selectedSet = new Set(selection?.selectedVerses || []);
-      const selectAll = selection?.allSelected || (!selection || selectedSet.size === 0);
-      if (selectAll) {
-        ids.push(...entry.verseIds);
+      // If selection exists and allSelected is true, include all verses
+      // If selection exists with specific verses, include only those
+      // If no selection exists, include all verses (chapter was selected in chapter mode)
+      if (selection) {
+        if (selection.allSelected) {
+          ids.push(...entry.verseIds);
+        } else if (selection.selectedVerses && selection.selectedVerses.length > 0) {
+          const selectedSet = new Set(selection.selectedVerses);
+          entry.verseIds.forEach((id) => {
+            const verseNumber = Number(id.split(',')[2]);
+            if (selectedSet.has(verseNumber)) {
+              ids.push(id);
+            }
+          });
+        }
+        // If selection exists but has no verses selected, don't include any
       } else {
-        entry.verseIds.forEach((id) => {
-          const verseNumber = Number(id.split(',')[2]);
-          if (selectedSet.has(verseNumber)) {
-            ids.push(id);
-          }
-        });
+        // No selection object means chapter was selected in chapter mode - include all verses
+        ids.push(...entry.verseIds);
       }
     }
   });
@@ -1330,6 +1338,43 @@ const renderVerseOptions = (year, selectedValues = new Set()) => {
   updateStartState();
 };
 
+const syncVerseSelectorToState = (chapterKeys = null) => {
+  const targetKeys = chapterKeys ? new Set(chapterKeys) : null;
+  const touchedBooks = new Set();
+  verseChapterToggleMap.forEach((entry, chapterKey) => {
+    if (targetKeys && !targetKeys.has(chapterKey)) return;
+    const selection = appState.verseSelections?.[chapterKey];
+    const chapterSelected = appState.activeChapters.includes(chapterKey);
+    const selectAll = selection?.allSelected || (!selection && chapterSelected);
+    const verseSet = new Set(selection?.selectedVerses || []);
+
+    if (entry.verseCheckboxes?.length) {
+      entry.verseCheckboxes.forEach(({ input, verseNum }) => {
+        input.checked = selectAll || verseSet.has(verseNum);
+      });
+    }
+
+    if (entry.chapterCheckbox) {
+      entry.chapterCheckbox.checked = selectAll || verseSet.size > 0;
+      entry.chapterCheckbox.indeterminate = !entry.chapterCheckbox.checked && verseSet.size > 0;
+    }
+    updateChapterToggleState(chapterKey);
+    const bookKey = verseChapterToBook.get(chapterKey);
+    if (bookKey) touchedBooks.add(bookKey);
+  });
+
+  touchedBooks.forEach((bookKey) => updateBookToggleState(bookKey));
+};
+
+const syncChapterSelectorToState = () => {
+  // Sync chapter checkboxes based on appState.activeChapters
+  chapterOptions.forEach((option) => {
+    const chapterKey = option.value;
+    option.checked = appState.activeChapters.includes(chapterKey);
+  });
+  updateBookToggleStates();
+};
+
 const updateVerseToggleStates = () => {
   verseChapterToggleMap.forEach(({ chapterCheckbox, verseCheckboxes, chapterKey }) => {
     const selection = appState.verseSelections?.[chapterKey];
@@ -1445,6 +1490,100 @@ const getVerseNumbersForChapter = (chapterKey) => {
 const hasVerseSelection = (selection) =>
   !!(selection && (selection.allSelected || (selection.selectedVerses && selection.selectedVerses.length > 0)));
 
+const updateVerseOptionsForChapter = (chapterKey) => {
+  const entry = verseChapterToggleMap.get(chapterKey);
+  if (!entry) return; // Chapter not in verse selector UI
+
+  const verseNumbers = getVerseNumbersForChapter(chapterKey);
+  const selection = appState.verseSelections?.[chapterKey];
+  const chapterSelected = appState.activeChapters.includes(chapterKey);
+  const allSelected = selection?.allSelected || (!selection && chapterSelected);
+  const selectedVerses = new Set(selection?.selectedVerses || []);
+
+  // If the chapter already has verse checkboxes rendered, just update their state
+  if (entry.verseCheckboxes?.length > 0) {
+    entry.verseCheckboxes.forEach(({ input, verseNum }) => {
+      input.checked = allSelected || selectedVerses.has(verseNum);
+    });
+    updateChapterToggleState(chapterKey);
+    const bookKey = verseChapterToBook.get(chapterKey);
+    if (bookKey) updateBookToggleState(bookKey);
+    return;
+  }
+
+  // Chapter was just downloaded and needs verse checkboxes created
+  // Find the grid element in the DOM
+  const grid = entry.chapterCheckbox?.parentElement?.parentElement?.querySelector('.verse-grid');
+  if (!grid) return;
+
+  // Clear placeholder
+  grid.innerHTML = '';
+
+  // Create verse checkboxes
+  const verseCheckboxes = [];
+  const verseStatusEls = [];
+  const status = getChapterStatus(chapterKey);
+
+  verseNumbers.forEach((verseNum) => {
+    const verseId = `${chapterKey},${verseNum}`;
+    const verseLabel = document.createElement('label');
+    verseLabel.className = 'chapter-check verse-check';
+
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.className = 'verse-option';
+    input.value = verseId;
+    input.checked = allSelected || selectedVerses.has(verseNum);
+
+    const number = document.createElement('span');
+    number.className = 'chapter-number';
+    number.textContent = verseNum;
+
+    const verseStatus = document.createElement('span');
+    verseStatus.className = `chapter-status${status ? ` ${status}` : ''}`;
+    verseStatus.textContent = statusLabelFor(status);
+
+    verseLabel.appendChild(input);
+    verseLabel.appendChild(number);
+    verseLabel.appendChild(verseStatus);
+    grid.appendChild(verseLabel);
+
+    verseCheckboxes.push({ input, verseNum });
+    verseStatusEls.push(verseStatus);
+
+    const bookKey = verseChapterToBook.get(chapterKey);
+    input.addEventListener('change', () => {
+      ensureVerseSelectionEntry(chapterKey);
+      const selectionEntry = appState.verseSelections[chapterKey];
+      const set = new Set(selectionEntry.selectedVerses || []);
+      if (input.checked) {
+        set.add(verseNum);
+      } else {
+        set.delete(verseNum);
+      }
+      if (verseNumbers.length > 0 && set.size === verseNumbers.length) {
+        selectionEntry.allSelected = true;
+        selectionEntry.selectedVerses = [];
+      } else {
+        selectionEntry.allSelected = false;
+        selectionEntry.selectedVerses = Array.from(set);
+      }
+      handleVerseSelectionChange(chapterKey, bookKey);
+      updateChapterToggleState(chapterKey);
+      updateBookToggleState(bookKey);
+    });
+  });
+
+  // Update the entry with the new checkboxes
+  entry.verseCheckboxes = verseCheckboxes;
+  entry.verseStatusEls = verseStatusEls;
+  entry.verseNumbers = verseNumbers;
+
+  updateChapterToggleState(chapterKey);
+  const bookKey = verseChapterToBook.get(chapterKey);
+  if (bookKey) updateBookToggleState(bookKey);
+};
+
 const storeChapterData = (chapterKey, verses, source) => {
   const verseIds = [];
   verses.forEach(({ verse, text }) => {
@@ -1474,7 +1613,9 @@ const storeChapterData = (chapterKey, verses, source) => {
     status: STATUS.READY,
   };
   appState.chapterVerseCounts[chapterKey] = verseIds.length;
-  renderVerseOptions(appState.year, new Set(appState.activeChapters));
+
+  // Update verse selector for this chapter if it exists in the UI
+  updateVerseOptionsForChapter(chapterKey);
 };
 
 const parseVerses = (data) => {
@@ -1592,31 +1733,37 @@ const startDownloadsForSelection = () => {
 
 const handleChapterSelectionChange = () => {
   const selectedChapters = chapterOptions.filter((option) => option.checked).map((opt) => opt.value);
+  const selectedSet = new Set(selectedChapters);
+
+  // For newly selected chapters, create allSelected entry if no verse selection exists
   selectedChapters.forEach((chapterKey) => {
-    const selection = appState.verseSelections[chapterKey];
-    if (!selection) {
+    if (!appState.verseSelections[chapterKey]) {
       appState.verseSelections[chapterKey] = { allSelected: true, selectedVerses: [] };
     }
   });
 
+  // Remove verse selections for unchecked chapters
+  Object.keys(appState.verseSelections || {}).forEach((chapterKey) => {
+    if (!selectedSet.has(chapterKey)) {
+      delete appState.verseSelections[chapterKey];
+    }
+  });
+
+  // Combine chapters selected in chapter mode with those having verse selections
   const verseSelectedChapters = Object.entries(appState.verseSelections || {})
     .filter(([, selection]) => hasVerseSelection(selection))
     .map(([chapterKey]) => chapterKey);
 
   const combined = Array.from(new Set([...selectedChapters, ...verseSelectedChapters]));
   appState.activeChapters = combined;
-  Object.keys(appState.verseSelections || {}).forEach((chapterKey) => {
-    if (!combined.includes(chapterKey)) {
-      delete appState.verseSelections[chapterKey];
-    }
-  });
+
   updateBookToggleStates();
   saveState();
   startDownloadsForSelection();
   updateStartState();
+  syncVerseSelectorToState();
   updateVerseToggleStates();
   updateVerseIndicators();
-  renderVerseOptions(appState.year, new Set(appState.activeChapters));
   if (sessionActive) {
     // Recalculate TF-IDF for new selection
     calculateSessionTFIDF();
@@ -1657,6 +1804,7 @@ const handleVerseSelectionChange = (changedChapterKey = null, changedBookKey = n
   startDownloadsForSelection();
   recomputeActiveVerseIds();
   updateStartState();
+  syncChapterSelectorToState();
   updateBookToggleStates();
   if (changedChapterKey) {
     updateChapterToggleState(changedChapterKey);
@@ -1664,6 +1812,24 @@ const handleVerseSelectionChange = (changedChapterKey = null, changedBookKey = n
     if (bookKey) updateBookToggleState(bookKey);
   } else if (changedBookKey) {
     updateBookToggleState(changedBookKey);
+  }
+  if (sessionActive) {
+    // Recalculate TF-IDF for new selection
+    calculateSessionTFIDF();
+
+    // Rebuild the question order if the selection changed while in session.
+    questionOrder = shuffle(appState.activeVerseIds);
+    const seedPoints = questionOrder.map((id) => randomPointsValue(id));
+    const blanksData = questionOrder.map((id, idx) =>
+      applyBlanks(appState.verseBank[id]?.text || '', seedPoints[idx], id)
+    );
+    questionPointsList = blanksData.map((data) => data.blankedWords.length);
+    questionBlanksList = blanksData.map(data => data.blanked);
+    questionAnswersList = blanksData.map(data => data.answer);
+    questionBlankedWordsList = blanksData.map(data => data.blankedWords);
+    hintsRevealedList = blanksData.map(() => 0);
+    questionIndex = 0;
+    updateQuestionView();
   }
 };
 
@@ -2194,6 +2360,8 @@ const showSelectorView = (mode) => {
   verseSelector.style.display = verseDisplay;
   if (activeSelector === 'verse') {
     updateVerseIndicators();
+  } else if (activeSelector === 'chapter') {
+    syncChapterSelectorToState();
   }
 };
 
