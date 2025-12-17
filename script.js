@@ -1276,6 +1276,24 @@ const updateVerseIndicators = () => {
   });
 };
 
+const updateVerseStatusForChapter = (chapterKey) => {
+  const entry = verseChapterToggleMap.get(chapterKey);
+  if (!entry) return;
+  const status = getChapterStatus(chapterKey);
+  const label = statusLabelFor(status);
+  const { statusSpan, verseStatusEls } = entry;
+  if (statusSpan) {
+    statusSpan.textContent = label;
+    statusSpan.className = `chapter-status${status ? ` ${status}` : ''}`;
+  }
+  if (verseStatusEls) {
+    verseStatusEls.forEach((el) => {
+      el.textContent = label;
+      el.className = `chapter-status${status ? ` ${status}` : ''}`;
+    });
+  }
+};
+
 const updateChapterToggleState = (chapterKey) => {
   const entry = verseChapterToggleMap.get(chapterKey);
   if (!entry) return;
@@ -1401,6 +1419,7 @@ const markChapterStatus = (chapterKey, status) => {
     appState.chapterIndex[chapterKey].status = status;
   }
   updateChapterIndicators();
+  updateVerseStatusForChapter(chapterKey);
   updateStartState();
   saveState();
 };
@@ -2079,6 +2098,9 @@ const showSelectorView = (mode) => {
   const verseDisplay = hasSelection && activeSelector === 'verse' ? 'block' : 'none';
   chapterSelector.style.display = chapterDisplay;
   verseSelector.style.display = verseDisplay;
+  if (activeSelector === 'verse') {
+    updateVerseIndicators();
+  }
 };
 
 const toggleChapterSelector = () => {
