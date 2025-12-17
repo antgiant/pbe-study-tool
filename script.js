@@ -1970,7 +1970,7 @@ const calculateSessionTFIDF = () => {
 };
 
 const normalizeTextForNlp = (text) => {
-  // Remove capitalization from words following commas, except for priority_words
+  // Remove capitalization from words following punctuation, except for priority_words
   const PRIORITY_WORDS = new Set([
     // Divine names and titles
     'lord', 'god', 'jesus', 'christ', 'messiah', 'savior', 'redeemer', 'spirit', 'father', 'holy', 'almighty', 'yahweh', 'jehovah',
@@ -1996,27 +1996,25 @@ const normalizeTextForNlp = (text) => {
     'philistines', 'egyptians', 'babylonians', 'assyrians', 'romans', 'persians', 'medes',
   ]);
 
-  // Split text into segments at commas
-  const parts = text.split(/,\s*/);
+  // Use a regex to find all punctuation followed by whitespace and capture what follows
+  // This handles: . ! ? , ; : and any whitespace after them
+  return text.replace(/([.!?,;:])\s+(\S)/g, (match, punct, firstChar) => {
+    // Get the full word following the punctuation
+    const restOfText = text.substring(text.indexOf(match) + match.length - 1);
+    const wordMatch = restOfText.match(/^(\S+)/);
 
-  // Process each part after a comma (skip the first part)
-  for (let i = 1; i < parts.length; i++) {
-    // Get the first word after the comma
-    const words = parts[i].split(/\s+/);
-    if (words.length > 0 && words[0]) {
-      const firstWord = words[0];
-      const lowerFirstWord = firstWord.toLowerCase();
+    if (wordMatch) {
+      const fullWord = wordMatch[1];
+      const lowerWord = fullWord.toLowerCase();
 
       // Only lowercase if it's not a priority word
-      if (!PRIORITY_WORDS.has(lowerFirstWord)) {
-        // Replace the first word with lowercase version
-        words[0] = firstWord.charAt(0).toLowerCase() + firstWord.slice(1);
-        parts[i] = words.join(' ');
+      if (!PRIORITY_WORDS.has(lowerWord)) {
+        return punct + ' ' + firstChar.toLowerCase();
       }
     }
-  }
 
-  return parts.join(', ');
+    return match;
+  });
 };
 
 const applyBlanks = (htmlText, blanks, verseId) => {
