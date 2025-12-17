@@ -129,17 +129,15 @@ button:disabled {
 }
 
 .chapter-check {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  justify-content: space-between;
+  gap: 6px;
   margin: 0;
   padding: 8px 10px;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.15);
   background: rgba(255, 255, 255, 0.05);
   font-weight: 600;
-  overflow: hidden; /* keep emoji inside on narrow screens */
 }
 
 .chapter-check input {
