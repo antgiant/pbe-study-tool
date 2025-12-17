@@ -51,9 +51,15 @@ let storageWritable = true;
 
 // IndexedDB Configuration
 const DB_NAME = 'PBEDatabase';
-const DB_VERSION = 1;
-const STORE_NAME = 'appState';
-const STATE_KEY = 'currentState';
+const DB_VERSION = 2; // Incremented for schema change
+const STORE_SETTINGS = 'settings';
+const STORE_SELECTIONS = 'selections';
+const STORE_CHAPTERS = 'chapters';
+const STORE_VERSES = 'verses';
+const LEGACY_STORE = 'appState'; // Old store for migration
+const STATE_KEY = 'currentState'; // Legacy key
+const SETTINGS_KEY = 'userSettings';
+const SELECTIONS_STORE_KEY = 'currentSelections';
 
 // IndexedDB Helper Functions
 const openDatabase = () => {
@@ -65,8 +71,39 @@ const openDatabase = () => {
 
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME);
+      const oldVersion = event.oldVersion;
+
+      // Migration from version 1 to version 2
+      if (oldVersion < 2) {
+        // Create new object stores
+
+        // Settings store - simple key-value
+        if (!db.objectStoreNames.contains(STORE_SETTINGS)) {
+          db.createObjectStore(STORE_SETTINGS);
+        }
+
+        // Selections store - simple key-value
+        if (!db.objectStoreNames.contains(STORE_SELECTIONS)) {
+          db.createObjectStore(STORE_SELECTIONS);
+        }
+
+        // Chapters store - indexed by chapterKey
+        if (!db.objectStoreNames.contains(STORE_CHAPTERS)) {
+          const chapterStore = db.createObjectStore(STORE_CHAPTERS, { keyPath: 'chapterKey' });
+          chapterStore.createIndex('bookId', 'bookId', { unique: false });
+          chapterStore.createIndex('status', 'status', { unique: false });
+          chapterStore.createIndex('lastUpdated', 'lastUpdated', { unique: false });
+        }
+
+        // Verses store - indexed by verseId
+        if (!db.objectStoreNames.contains(STORE_VERSES)) {
+          const verseStore = db.createObjectStore(STORE_VERSES, { keyPath: 'verseId' });
+          verseStore.createIndex('chapterKey', 'chapterKey', { unique: false });
+          verseStore.createIndex('bookId', 'bookId', { unique: false });
+          verseStore.createIndex('bookChapter', ['bookId', 'chapter'], { unique: false });
+        }
+
+        // Keep legacy store for migration, will be deleted after migration completes
       }
     };
   });
@@ -76,8 +113,8 @@ const getFromIndexedDB = async (key) => {
   try {
     const db = await openDatabase();
     return new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORE_NAME], 'readonly');
-      const store = transaction.objectStore(STORE_NAME);
+      const transaction = db.transaction([LEGACY_STORE], 'readonly');
+      const store = transaction.objectStore(LEGACY_STORE);
       const request = store.get(key);
 
       request.onsuccess = () => resolve(request.result);
@@ -93,8 +130,8 @@ const setToIndexedDB = async (key, value) => {
   try {
     const db = await openDatabase();
     return new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORE_NAME], 'readwrite');
-      const store = transaction.objectStore(STORE_NAME);
+      const transaction = db.transaction([LEGACY_STORE], 'readwrite');
+      const store = transaction.objectStore(LEGACY_STORE);
       const request = store.put(value, key);
 
       request.onsuccess = () => resolve();
@@ -115,7 +152,7 @@ const migrateFromLocalStorage = async () => {
     const parsed = JSON.parse(raw);
     console.log('Migrating data from localStorage to IndexedDB...');
 
-    // Save to IndexedDB
+    // Save to IndexedDB (legacy format, will be migrated to new schema)
     await setToIndexedDB(STATE_KEY, parsed);
 
     // Clear localStorage after successful migration
@@ -127,6 +164,380 @@ const migrateFromLocalStorage = async () => {
   } catch (err) {
     console.warn('Migration from localStorage failed:', err);
     return null;
+  }
+};
+
+// New Granular API Functions for Optimized Schema
+
+// Settings API
+const getSettings = async () => {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_SETTINGS], 'readonly');
+      const store = transaction.objectStore(STORE_SETTINGS);
+      const request = store.get(SETTINGS_KEY);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.warn('Error getting settings:', err);
+    return null;
+  }
+};
+
+const updateSettings = async (settings) => {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_SETTINGS], 'readwrite');
+      const store = transaction.objectStore(STORE_SETTINGS);
+      const request = store.put(settings, SETTINGS_KEY);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.warn('Error updating settings:', err);
+    throw err;
+  }
+};
+
+// Selections API
+const getSelections = async () => {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_SELECTIONS], 'readonly');
+      const store = transaction.objectStore(STORE_SELECTIONS);
+      const request = store.get(SELECTIONS_STORE_KEY);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.warn('Error getting selections:', err);
+    return null;
+  }
+};
+
+const updateSelections = async (selections) => {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_SELECTIONS], 'readwrite');
+      const store = transaction.objectStore(STORE_SELECTIONS);
+      const request = store.put(selections, SELECTIONS_STORE_KEY);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.warn('Error updating selections:', err);
+    throw err;
+  }
+};
+
+// Chapters API
+const getChapter = async (chapterKey) => {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_CHAPTERS], 'readonly');
+      const store = transaction.objectStore(STORE_CHAPTERS);
+      const request = store.get(chapterKey);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.warn('Error getting chapter:', err);
+    return null;
+  }
+};
+
+const getAllChapters = async () => {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_CHAPTERS], 'readonly');
+      const store = transaction.objectStore(STORE_CHAPTERS);
+      const request = store.getAll();
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.warn('Error getting all chapters:', err);
+    return [];
+  }
+};
+
+const saveChapter = async (chapter) => {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_CHAPTERS], 'readwrite');
+      const store = transaction.objectStore(STORE_CHAPTERS);
+      const request = store.put(chapter);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.warn('Error saving chapter:', err);
+    throw err;
+  }
+};
+
+const deleteChapter = async (chapterKey) => {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_CHAPTERS], 'readwrite');
+      const store = transaction.objectStore(STORE_CHAPTERS);
+      const request = store.delete(chapterKey);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.warn('Error deleting chapter:', err);
+    throw err;
+  }
+};
+
+// Verses API
+const getVerse = async (verseId) => {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_VERSES], 'readonly');
+      const store = transaction.objectStore(STORE_VERSES);
+      const request = store.get(verseId);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.warn('Error getting verse:', err);
+    return null;
+  }
+};
+
+const getVersesByChapter = async (chapterKey) => {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_VERSES], 'readonly');
+      const store = transaction.objectStore(STORE_VERSES);
+      const index = store.index('chapterKey');
+      const request = index.getAll(chapterKey);
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.warn('Error getting verses by chapter:', err);
+    return [];
+  }
+};
+
+const getVersesByChapters = async (chapterKeys) => {
+  try {
+    const db = await openDatabase();
+    const allVerses = [];
+
+    for (const chapterKey of chapterKeys) {
+      const verses = await new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_VERSES], 'readonly');
+        const store = transaction.objectStore(STORE_VERSES);
+        const index = store.index('chapterKey');
+        const request = index.getAll(chapterKey);
+        request.onsuccess = () => resolve(request.result || []);
+        request.onerror = () => reject(request.error);
+      });
+      allVerses.push(...verses);
+    }
+
+    return allVerses;
+  } catch (err) {
+    console.warn('Error getting verses by chapters:', err);
+    return [];
+  }
+};
+
+const saveVerse = async (verse) => {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_VERSES], 'readwrite');
+      const store = transaction.objectStore(STORE_VERSES);
+      const request = store.put(verse);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.warn('Error saving verse:', err);
+    throw err;
+  }
+};
+
+const saveVerses = async (verses) => {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_VERSES], 'readwrite');
+      const store = transaction.objectStore(STORE_VERSES);
+
+      let completed = 0;
+      const total = verses.length;
+
+      verses.forEach(verse => {
+        const request = store.put(verse);
+        request.onsuccess = () => {
+          completed++;
+          if (completed === total) resolve();
+        };
+        request.onerror = () => reject(request.error);
+      });
+
+      if (total === 0) resolve();
+    });
+  } catch (err) {
+    console.warn('Error saving verses:', err);
+    throw err;
+  }
+};
+
+const deleteVersesByChapter = async (chapterKey) => {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_VERSES], 'readwrite');
+      const store = transaction.objectStore(STORE_VERSES);
+      const index = store.index('chapterKey');
+      const request = index.openCursor(chapterKey);
+
+      request.onsuccess = (event) => {
+        const cursor = event.target.result;
+        if (cursor) {
+          cursor.delete();
+          cursor.continue();
+        } else {
+          resolve();
+        }
+      };
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.warn('Error deleting verses by chapter:', err);
+    throw err;
+  }
+};
+
+// Big Bang Migration from Old Schema to New Schema
+const migrateToOptimizedSchema = async (oldState) => {
+  console.log('Starting migration to optimized IndexedDB schema...');
+
+  try {
+    // 1. Migrate settings
+    const settings = {
+      version: oldState.version || STATE_VERSION,
+      year: oldState.year || '',
+      activeSelector: oldState.activeSelector || 'chapter',
+      minBlanks: oldState.minBlanks || 1,
+      maxBlanks: oldState.maxBlanks || 1,
+      maxBlankPercentage: oldState.maxBlankPercentage || 100,
+      lastUpdated: new Date().toISOString()
+    };
+    await updateSettings(settings);
+    console.log('✓ Settings migrated');
+
+    // 2. Migrate selections
+    const selections = {
+      activeChapters: oldState.activeChapters || [],
+      verseSelections: oldState.verseSelections || {}
+    };
+    await updateSelections(selections);
+    console.log('✓ Selections migrated');
+
+    // 3. Migrate chapters
+    const chapters = Object.entries(oldState.chapterIndex || {}).map(([key, data]) => {
+      const [bookId, chapter] = key.split(',').map(Number);
+      return {
+        chapterKey: key,
+        bookId: bookId,
+        chapter: chapter,
+        status: data.status || STATUS.NOT_DOWNLOADED,
+        lastUpdated: data.lastUpdated || new Date().toISOString(),
+        verseCount: data.verseIds?.length || 0
+      };
+    });
+
+    for (const chapter of chapters) {
+      await saveChapter(chapter);
+    }
+    console.log(`✓ ${chapters.length} chapters migrated`);
+
+    // 4. Migrate verses
+    const verses = Object.entries(oldState.verseBank || {}).map(([id, verse]) => ({
+      verseId: id,
+      chapterKey: `${verse.bookId},${verse.chapter}`,
+      bookId: verse.bookId,
+      chapter: verse.chapter,
+      verse: verse.verse,
+      text: verse.text,
+      source: verse.source,
+      downloadedAt: new Date().toISOString()
+    }));
+
+    // Save verses in batches for better performance
+    await saveVerses(verses);
+    console.log(`✓ ${verses.length} verses migrated`);
+
+    // 5. Mark migration as complete by deleting old data
+    const db = await openDatabase();
+    if (db.objectStoreNames.contains(LEGACY_STORE)) {
+      await new Promise((resolve, reject) => {
+        const transaction = db.transaction([LEGACY_STORE], 'readwrite');
+        const store = transaction.objectStore(LEGACY_STORE);
+        const request = store.delete(STATE_KEY);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    console.log('✓ Migration to optimized schema complete!');
+    return true;
+  } catch (err) {
+    console.error('Migration to optimized schema failed:', err);
+    throw err;
+  }
+};
+
+// Check if migration to new schema is needed
+const checkAndMigrateSchema = async () => {
+  try {
+    // Check if we already have data in the new schema
+    const settings = await getSettings();
+    if (settings) {
+      // Already migrated
+      return false;
+    }
+
+    // Check if we have data in the old schema
+    const oldData = await getFromIndexedDB(STATE_KEY);
+    if (oldData) {
+      // Migrate from old schema
+      await migrateToOptimizedSchema(oldData);
+      return true;
+    }
+
+    // Check if we need to migrate from localStorage
+    const localStorageData = await migrateFromLocalStorage();
+    if (localStorageData) {
+      // Migrate localStorage data to new schema
+      await migrateToOptimizedSchema(localStorageData);
+      return true;
+    }
+
+    // No data to migrate
+    return false;
+  } catch (err) {
+    console.warn('Schema migration check failed:', err);
+    return false;
   }
 };
 
@@ -743,53 +1154,96 @@ const migrateTFIDFData = (state) => {
 
 const loadState = async () => {
   try {
-    // Try to load from IndexedDB first
-    let parsed = await getFromIndexedDB(STATE_KEY);
+    // Check and perform migration if needed
+    await checkAndMigrateSchema();
 
-    // If not in IndexedDB, try migrating from localStorage
-    if (!parsed) {
-      parsed = await migrateFromLocalStorage();
+    // Load settings from new schema
+    const settings = await getSettings();
+    if (!settings) {
+      // No data found, return null for fresh start
+      return null;
     }
 
-    if (!parsed) return null;
+    // Load selections
+    const selections = await getSelections();
 
-    if (parsed.version === STATE_VERSION) {
-      const normalized = { ...defaultState, ...parsed };
-      if (!normalized.verseSelections || typeof normalized.verseSelections !== 'object') {
-        normalized.verseSelections = {};
-      }
-      if (!normalized.chapterVerseCounts || typeof normalized.chapterVerseCounts !== 'object') {
-        normalized.chapterVerseCounts = {};
-      }
-      if (normalized.activeSelector !== 'verse') {
-        normalized.activeSelector = 'chapter';
-      }
-      // Clear transient/error statuses on load so retry indicators do not persist.
-      Object.entries(normalized.chapterIndex || {}).forEach(([key, entry]) => {
-        if (!entry) return;
-        if (entry.status === STATUS.ERROR || entry.status === STATUS.DOWNLOADING) {
-          entry.status = undefined;
-        }
-        if (entry.verseIds?.length) {
-          normalized.chapterVerseCounts[key] = entry.verseIds.length;
-        } else if (entry.status === STATUS.READY) {
-          // If we persisted a READY flag without verseIds, force a fresh download
-          entry.status = STATUS.NOT_DOWNLOADED;
+    // Load all chapters
+    const chapters = await getAllChapters();
+
+    // Build chapterIndex from chapters
+    const chapterIndex = {};
+    const chapterVerseCounts = {};
+    const activeChapters = selections?.activeChapters || [];
+
+    chapters.forEach(chapter => {
+      chapterIndex[chapter.chapterKey] = {
+        status: chapter.status,
+        lastUpdated: chapter.lastUpdated,
+        verseIds: [] // Will be populated when verses are loaded
+      };
+      chapterVerseCounts[chapter.chapterKey] = chapter.verseCount;
+    });
+
+    // Load verses only for active chapters (lazy loading)
+    const verseBank = {};
+    if (activeChapters.length > 0) {
+      const verses = await getVersesByChapters(activeChapters);
+      verses.forEach(verse => {
+        verseBank[verse.verseId] = {
+          bookId: verse.bookId,
+          chapter: verse.chapter,
+          verse: verse.verse,
+          text: verse.text,
+          source: verse.source,
+          termFrequency: verse.termFrequency || {},
+          wordList: verse.wordList || []
+        };
+
+        // Populate verseIds in chapterIndex
+        const chapterKey = verse.chapterKey;
+        if (chapterIndex[chapterKey] && !chapterIndex[chapterKey].verseIds.includes(verse.verseId)) {
+          chapterIndex[chapterKey].verseIds.push(verse.verseId);
         }
       });
-      // Migrate old verses to include TF-IDF data
-      migrateTFIDFData(normalized);
-      return normalized;
     }
-    // Backward compatibility with the earlier shape.
-    if (parsed.year || parsed.chapters) {
-      return {
-        ...defaultState,
-        year: parsed.year || '',
-        activeChapters: parsed.chapters || [],
-      };
-    }
-    return null;
+
+    // Clear transient/error statuses on load
+    Object.entries(chapterIndex).forEach(([key, entry]) => {
+      if (entry.status === STATUS.ERROR || entry.status === STATUS.DOWNLOADING) {
+        entry.status = undefined;
+      }
+      if (entry.verseIds?.length) {
+        chapterVerseCounts[key] = entry.verseIds.length;
+      } else if (entry.status === STATUS.READY) {
+        entry.status = STATUS.NOT_DOWNLOADED;
+      }
+    });
+
+    // Build state object
+    const state = {
+      ...defaultState,
+      version: settings.version || STATE_VERSION,
+      year: settings.year || '',
+      activeSelector: settings.activeSelector || 'chapter',
+      minBlanks: settings.minBlanks || 1,
+      maxBlanks: settings.maxBlanks || 1,
+      maxBlankPercentage: settings.maxBlankPercentage || 100,
+      activeChapters: selections?.activeChapters || [],
+      verseSelections: selections?.verseSelections || {},
+      chapterIndex,
+      chapterVerseCounts,
+      verseBank,
+      activeVerseIds: [], // Will be recomputed
+      tfidfCache: {
+        verseLevel: {},
+        chapterLevel: {}
+      }
+    };
+
+    // Migrate old verses to include TF-IDF data if needed
+    migrateTFIDFData(state);
+
+    return state;
   } catch (err) {
     console.warn('Unable to load saved settings', err);
     return null;
@@ -799,15 +1253,69 @@ const loadState = async () => {
 const saveState = async () => {
   if (!storageWritable) return;
   try {
-    const persistable = buildPersistableState(true);
-    await setToIndexedDB(STATE_KEY, persistable);
+    // Save settings (small, fast)
+    const settings = {
+      version: appState.version || STATE_VERSION,
+      year: appState.year,
+      activeSelector: appState.activeSelector,
+      minBlanks: appState.minBlanks,
+      maxBlanks: appState.maxBlanks,
+      maxBlankPercentage: appState.maxBlankPercentage,
+      lastUpdated: new Date().toISOString()
+    };
+    await updateSettings(settings);
+
+    // Save selections (small, fast)
+    const selections = {
+      activeChapters: appState.activeChapters,
+      verseSelections: appState.verseSelections
+    };
+    await updateSelections(selections);
+
+    // Note: Chapters and verses are saved individually when they're downloaded/updated
+    // This keeps saveState lightweight for frequent operations
   } catch (err) {
     console.warn('Unable to save settings to IndexedDB', err);
-    // IndexedDB rarely has quota issues, but if it fails, disable further saves
     if (err.name === 'QuotaExceededError') {
       storageWritable = false;
       console.warn('Storage quota exceeded; further saves disabled');
     }
+  }
+};
+
+// Save a downloaded chapter and its verses
+const saveChapterData = async (chapterKey, verses, source) => {
+  try {
+    const [bookId, chapter] = chapterKey.split(',').map(Number);
+
+    // Save chapter metadata
+    const chapterData = {
+      chapterKey,
+      bookId,
+      chapter,
+      status: STATUS.READY,
+      lastUpdated: new Date().toISOString(),
+      verseCount: verses.length
+    };
+    await saveChapter(chapterData);
+
+    // Save all verses
+    const verseData = verses.map(verse => ({
+      verseId: verse.verseId,
+      chapterKey,
+      bookId,
+      chapter,
+      verse: verse.verse,
+      text: verse.text,
+      source,
+      downloadedAt: new Date().toISOString()
+    }));
+    await saveVerses(verseData);
+
+    return { chapter: chapterData, verses: verseData };
+  } catch (err) {
+    console.error('Error saving chapter data:', err);
+    throw err;
   }
 };
 const recomputeActiveVerseIds = () => {
@@ -1635,8 +2143,10 @@ const updateVerseOptionsForChapter = (chapterKey) => {
   if (bookKey) updateBookToggleState(bookKey);
 };
 
-const storeChapterData = (chapterKey, verses, source) => {
+const storeChapterData = async (chapterKey, verses, source) => {
   const verseIds = [];
+  const versesToSave = [];
+
   verses.forEach(({ verse, text }) => {
     const id = `${chapterKey},${verse}`;
     verseIds.push(id);
@@ -1648,6 +2158,7 @@ const storeChapterData = (chapterKey, verses, source) => {
     const termFrequency = calculateTermFrequency(words);
     const wordList = Array.from(new Set(words));
 
+    // Update in-memory state
     appState.verseBank[id] = {
       bookId,
       chapter,
@@ -1657,13 +2168,45 @@ const storeChapterData = (chapterKey, verses, source) => {
       termFrequency,
       wordList,
     };
+
+    // Prepare verse for IndexedDB
+    versesToSave.push({
+      verseId: id,
+      chapterKey,
+      bookId,
+      chapter,
+      verse,
+      text,
+      source,
+      termFrequency,
+      wordList,
+      downloadedAt: new Date().toISOString()
+    });
   });
+
+  // Update in-memory chapter index
   appState.chapterIndex[chapterKey] = {
     verseIds,
     lastUpdated: new Date().toISOString(),
     status: STATUS.READY,
   };
   appState.chapterVerseCounts[chapterKey] = verseIds.length;
+
+  // Save to IndexedDB
+  try {
+    const [bookId, chapter] = chapterKey.split(',').map(Number);
+    await saveChapter({
+      chapterKey,
+      bookId,
+      chapter,
+      status: STATUS.READY,
+      lastUpdated: new Date().toISOString(),
+      verseCount: verseIds.length
+    });
+    await saveVerses(versesToSave);
+  } catch (err) {
+    console.warn('Failed to save chapter to IndexedDB:', err);
+  }
 
   // Update verse selector for this chapter if it exists in the UI
   updateVerseOptionsForChapter(chapterKey);
@@ -1744,12 +2287,12 @@ const downloadChapterIfNeeded = (chapterKey) => {
   markChapterStatus(chapterKey, STATUS.DOWNLOADING);
 
   const downloadPromise = fetchChapter(chapterKey)
-    .then((data) => {
+    .then(async (data) => {
       const verses = parseVerses(data);
       if (!verses.length) {
         throw new Error(`No verses found for ${chapterKey}`);
       }
-      storeChapterData(chapterKey, verses, 'NKJV');
+      await storeChapterData(chapterKey, verses, 'NKJV');
       markChapterStatus(chapterKey, STATUS.READY);
       recomputeActiveVerseIds();
       saveState();
