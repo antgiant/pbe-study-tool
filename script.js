@@ -30,6 +30,7 @@ const maxBlankPercentageInput = document.getElementById('max-blank-percentage');
 const blankLimitHint = document.getElementById('blank-limit');
 
 const STORAGE_KEY = 'pbeSettings';
+const SELECTIONS_KEY = 'pbeSelections';
 const STATE_VERSION = 1;
 const STATUS = {
   READY: 'ready',
@@ -51,11 +52,14 @@ let storageWritable = true;
 const buildPersistableState = (includeVerses = true) => {
   const chapterIndex = {};
   const verseBank = {};
-  const allowedChapters = new Set();
+  const allowedChapters = new Set([
+    ...(appState.activeChapters || []),
+    ...Object.keys(appState.verseSelections || {}),
+  ]);
 
   Object.entries(appState.chapterIndex || {}).forEach(([key, entry]) => {
     if (!entry) return;
-    const hasVerses = includeVerses && entry.verseIds?.length;
+    const hasVerses = includeVerses && entry.verseIds?.length && allowedChapters.has(key);
     chapterIndex[key] = {
       status: hasVerses ? entry.status : STATUS.NOT_DOWNLOADED,
       lastUpdated: entry.lastUpdated,
@@ -658,10 +662,25 @@ const migrateTFIDFData = (state) => {
 const loadState = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
+    const selectionRaw = localStorage.getItem(SELECTIONS_KEY);
+    let selectionData = null;
+    if (selectionRaw) {
+      try {
+        selectionData = JSON.parse(selectionRaw);
+      } catch (e) {
+        selectionData = null;
+      }
+    }
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (parsed.version === STATE_VERSION) {
       const normalized = { ...defaultState, ...parsed };
+      if (selectionData?.verseSelections) {
+        normalized.verseSelections = selectionData.verseSelections;
+      }
+      if (selectionData?.activeChapters) {
+        normalized.activeChapters = selectionData.activeChapters;
+      }
       if (!normalized.verseSelections || typeof normalized.verseSelections !== 'object') {
         normalized.verseSelections = {};
       }
@@ -708,12 +727,26 @@ const saveState = () => {
   try {
     const persistable = buildPersistableState(true);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(persistable));
+    localStorage.setItem(
+      SELECTIONS_KEY,
+      JSON.stringify({
+        verseSelections: appState.verseSelections,
+        activeChapters: appState.activeChapters,
+      })
+    );
   } catch (err) {
     if (err && err.name === 'QuotaExceededError') {
       // Retry with a minimal state (no verse text) so at least selections persist
       try {
         const minimal = buildPersistableState(false);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(minimal));
+        localStorage.setItem(
+          SELECTIONS_KEY,
+          JSON.stringify({
+            verseSelections: appState.verseSelections,
+            activeChapters: appState.activeChapters,
+          })
+        );
         console.warn('Saved settings without downloaded verses due to quota limits');
       } catch (innerErr) {
         storageWritable = false;
@@ -1561,7 +1594,7 @@ const handleChapterSelectionChange = () => {
   const selectedChapters = chapterOptions.filter((option) => option.checked).map((opt) => opt.value);
   selectedChapters.forEach((chapterKey) => {
     const selection = appState.verseSelections[chapterKey];
-    if (!selection || !selection.allSelected) {
+    if (!selection) {
       appState.verseSelections[chapterKey] = { allSelected: true, selectedVerses: [] };
     }
   });
