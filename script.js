@@ -1776,13 +1776,18 @@ const renderYearOptions = (selectedYear = '') => {
   seasonSelect.innerHTML = '';
 
   const yearKeys = Object.keys(chaptersByYear).filter(key => key !== 'defaultYear');
+  const currentYearKey = computeCurrentYearKey(yearKeys);
 
   yearKeys.forEach((yearKey) => {
     const option = document.createElement('option');
     option.value = yearKey;
     const description = formatYearSelectionDescription(yearKey, chaptersByYear, books);
     const descriptionSuffix = description ? ` - ${description}` : '';
-    option.textContent = `${yearKey}${descriptionSuffix}`;
+    const isCurrent = currentYearKey === yearKey;
+    option.textContent = `${isCurrent ? '★ ' : ''}${yearKey}${descriptionSuffix}`;
+    if (isCurrent) {
+      option.classList.add('current-year-option');
+    }
     option.selected = selectedYear === yearKey;
     seasonSelect.appendChild(option);
   });
@@ -3514,6 +3519,24 @@ const showSelectorView = (mode) => {
   }
 };
 
+const computeCurrentYearKey = (yearKeys, now = new Date()) => {
+  const month = now.getMonth() + 1;
+  const calendarYear = now.getFullYear();
+  const matchPart = month <= 5 ? 'end' : 'start';
+  const parsed = (yearKeys || [])
+    .map((key) => {
+      const match = /^(\d{4})-(\d{4})$/.exec(key);
+      if (!match) return null;
+      return { key, start: Number(match[1]), end: Number(match[2]) };
+    })
+    .filter(Boolean);
+  const found = parsed.find((p) => p[matchPart] === calendarYear);
+  if (found) return found.key;
+  const altPart = matchPart === 'start' ? 'end' : 'start';
+  const alt = parsed.find((p) => p[altPart] === calendarYear);
+  return alt ? alt.key : null;
+};
+
 const toggleChapterSelector = () => {
   const hasSelection = seasonSelect.value.trim().length > 0;
   const blanksDisplay = hasSelection ? 'block' : 'none';
@@ -3631,8 +3654,10 @@ const handleMaxPercentChange = (evt) => {
   }
 
   // Apply default year for new users if no year is selected
-  if (!appState.year && chaptersByYear.defaultYear) {
-    appState.year = chaptersByYear.defaultYear;
+  if (!appState.year) {
+    const yearKeys = Object.keys(chaptersByYear).filter((k) => k !== 'defaultYear');
+    const currentKey = computeCurrentYearKey(yearKeys);
+    appState.year = currentKey || chaptersByYear.defaultYear || yearKeys[0] || '';
   }
 
   if (appState.year) {

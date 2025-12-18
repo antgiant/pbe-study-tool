@@ -27,6 +27,7 @@ import {
   buildExclusionSetFromInclusions,
   allowedVersesFromInclusions,
   formatYearSelectionDescription,
+  computeCurrentYearKey,
 } from '../src/utils.js';
 
 describe('stripHtml', () => {
@@ -671,6 +672,25 @@ describe('verse download helpers', () => {
       };
       const desc = formatYearSelectionDescription('year', chaptersByYear, books);
       expect(desc).toBe('Job 1, 3-4, 7:1-15');
+    });
+  });
+
+  describe('computeCurrentYearKey', () => {
+    const yearKeys = ['2022-2023', '2023-2024', '2024-2025', '2025-2026'];
+
+    it('should pick end year match for Jan-May', () => {
+      const now = new Date('2025-02-01T00:00:00Z');
+      expect(computeCurrentYearKey(yearKeys, now)).toBe('2024-2025');
+    });
+
+    it('should pick start year match for Jun-Dec', () => {
+      const now = new Date('2025-07-01T00:00:00Z');
+      expect(computeCurrentYearKey(yearKeys, now)).toBe('2025-2026');
+    });
+
+    it('should return null when no match', () => {
+      const now = new Date('2030-01-01T00:00:00Z');
+      expect(computeCurrentYearKey(yearKeys, now)).toBeNull();
     });
   });
 });

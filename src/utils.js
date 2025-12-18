@@ -458,6 +458,40 @@ export const allowedVersesFromInclusions = (totalVerses, includeRanges = []) => 
   return Array.from(allowed).sort((a, b) => a - b);
 };
 
+const parseYearKey = (yearKey) => {
+  const match = /^(\d{4})-(\d{4})$/.exec(yearKey);
+  if (!match) return null;
+  return { start: Number(match[1]), end: Number(match[2]) };
+};
+
+/**
+ * Determines the current year key based on real date and available year keys.
+ * Jan-May → match current calendar year to second part; Jun-Dec → match to first part.
+ * @param {string[]} yearKeys
+ * @param {Date} now
+ * @returns {string|null}
+ */
+export const computeCurrentYearKey = (yearKeys, now = new Date()) => {
+  if (!Array.isArray(yearKeys) || yearKeys.length === 0) return null;
+  const month = now.getMonth() + 1;
+  const calendarYear = now.getFullYear();
+  const matchPart = month <= 5 ? 'end' : 'start';
+
+  const parsed = yearKeys
+    .map((key) => ({ key, parsed: parseYearKey(key) }))
+    .filter((item) => item.parsed);
+
+  const found = parsed.find(({ parsed: p }) => p[matchPart] === calendarYear);
+  if (found) return found.key;
+
+  // Fallback: try the other part
+  const altPart = matchPart === 'start' ? 'end' : 'start';
+  const alt = parsed.find(({ parsed: p }) => p[altPart] === calendarYear);
+  if (alt) return alt.key;
+
+  return null;
+};
+
 /**
  * Returns the chapterKey (bookId,chapter) for a verseId
  * @param {string} verseId - Verse ID in the form bookId,chapter,verse
