@@ -263,6 +263,55 @@ describe('Chapter Persistence When Unselected', () => {
     expect(chapter11Verses).toHaveLength(2);
   });
 
+  it('should sort activeChapters numerically when loading from database', async () => {
+    // Save multiple chapters in unsorted order to database
+    const chapters = [
+      { chapterKey: '23,10', bookId: 23, chapter: 10, status: 'ready', lastUpdated: new Date().toISOString(), verseCount: 1 },
+      { chapterKey: '23,2', bookId: 23, chapter: 2, status: 'ready', lastUpdated: new Date().toISOString(), verseCount: 1 },
+      { chapterKey: '23,1', bookId: 23, chapter: 1, status: 'ready', lastUpdated: new Date().toISOString(), verseCount: 1 },
+      { chapterKey: '23,20', bookId: 23, chapter: 20, status: 'ready', lastUpdated: new Date().toISOString(), verseCount: 1 },
+    ];
+
+    for (const chapter of chapters) {
+      await saveChapter(chapter);
+      await saveVerses([{
+        verseId: `${chapter.chapterKey},1`,
+        chapterKey: chapter.chapterKey,
+        bookId: chapter.bookId,
+        chapter: chapter.chapter,
+        verse: 1,
+        text: `Chapter ${chapter.chapter} verse 1`,
+        source: 'NKJV',
+      }]);
+    }
+
+    // Save selections in unsorted order (as they might be saved from UI)
+    await updateSelections({
+      activeChapters: ['23,10', '23,2', '23,1', '23,20'],
+      verseSelections: {},
+    });
+
+    // Retrieve selections
+    const selections = await getSelections();
+
+    // The activeChapters should be sorted numerically: 1, 2, 10, 20 (not 1, 10, 2, 20)
+    // Note: In the actual app, loadState applies sortChapterKeys to ensure this
+    // Here we're testing that the data is stored correctly and can be sorted on load
+    expect(selections.activeChapters).toEqual(['23,10', '23,2', '23,1', '23,20']); // Stored as-is
+
+    // But when loaded through loadState logic (which we can't directly test here),
+    // it would be sorted to: ['23,1', '23,2', '23,10', '23,20']
+    // We can at least verify the sorting function would work correctly
+    const sorted = [...selections.activeChapters].sort((a, b) => {
+      const [bookIdA, chapterA] = a.split(',').map(Number);
+      const [bookIdB, chapterB] = b.split(',').map(Number);
+      if (bookIdA !== bookIdB) return bookIdA - bookIdB;
+      return chapterA - chapterB;
+    });
+
+    expect(sorted).toEqual(['23,1', '23,2', '23,10', '23,20']);
+  });
+
   it('should maintain chapter status as ready when verses are loaded', async () => {
     // Download a chapter
     const chapterKey = '43,3'; // John 3

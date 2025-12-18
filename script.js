@@ -1074,16 +1074,71 @@ const chaptersByYear = {
   '2027-2028': [{ bookKey: 'isaiah', start: 34, end: 66 }],
 };
 
+/**
+ * Sorts chapter keys numerically by book ID and chapter number
+ * Chapter keys are in format "bookId,chapter" (e.g., "23,1", "23,10", "23,2")
+ * Without this, string sorting would put "23,10" before "23,2"
+ */
+const sortChapterKeys = (chapterKeys) => {
+  return chapterKeys.sort((a, b) => {
+    const [bookIdA, chapterA] = a.split(',').map(Number);
+    const [bookIdB, chapterB] = b.split(',').map(Number);
+
+    // First compare by book ID
+    if (bookIdA !== bookIdB) {
+      return bookIdA - bookIdB;
+    }
+
+    // If same book, compare by chapter number
+    return chapterA - chapterB;
+  });
+};
+
+/**
+ * Sorts verse IDs numerically by book ID, chapter, and verse number
+ * Verse IDs are in format "bookId,chapter,verse" (e.g., "23,1,1", "23,1,10", "23,1,2")
+ * Without this, string sorting would put "23,1,10" before "23,1,2"
+ */
+const sortVerseIds = (verseIds) => {
+  return verseIds.sort((a, b) => {
+    const [bookIdA, chapterA, verseA] = a.split(',').map(Number);
+    const [bookIdB, chapterB, verseB] = b.split(',').map(Number);
+
+    // First compare by book ID
+    if (bookIdA !== bookIdB) {
+      return bookIdA - bookIdB;
+    }
+
+    // If same book, compare by chapter number
+    if (chapterA !== chapterB) {
+      return chapterA - chapterB;
+    }
+
+    // If same chapter, compare by verse number
+    return verseA - verseB;
+  });
+};
+
 const buildFullBibleSelections = () =>
-  Object.keys(books).map((bookKey) => ({
-    bookKey,
-    start: 1,
-    end: books[bookKey].totalChapters,
-  }));
+  Object.keys(books)
+    .map((bookKey) => ({
+      bookKey,
+      bookId: books[bookKey].id,
+      start: 1,
+      end: books[bookKey].totalChapters,
+    }))
+    .sort((a, b) => a.bookId - b.bookId);
 
 const getSelectionsForYear = (year) => {
   if (year === FULL_BIBLE_KEY) return buildFullBibleSelections();
-  return chaptersByYear[year] || [];
+  const selections = chaptersByYear[year] || [];
+  // Sort selections by book ID to ensure chapters appear in numerical order
+  return selections
+    .map((sel) => ({
+      ...sel,
+      bookId: books[sel.bookKey]?.id || 0,
+    }))
+    .sort((a, b) => a.bookId - b.bookId);
 };
 
 const defaultState = {
@@ -1208,6 +1263,13 @@ const loadState = async () => {
       });
     }
 
+    // Sort verseIds numerically for each chapter
+    Object.values(chapterIndex).forEach((entry) => {
+      if (entry.verseIds?.length) {
+        entry.verseIds = sortVerseIds(entry.verseIds);
+      }
+    });
+
     // Clear transient/error statuses on load
     Object.entries(chapterIndex).forEach(([key, entry]) => {
       if (entry.status === STATUS.ERROR || entry.status === STATUS.DOWNLOADING) {
@@ -1229,7 +1291,8 @@ const loadState = async () => {
       minBlanks: settings.minBlanks || 1,
       maxBlanks: settings.maxBlanks || 1,
       maxBlankPercentage: settings.maxBlankPercentage || 100,
-      activeChapters: selections?.activeChapters || [],
+      // Sort activeChapters numerically when loading from database
+      activeChapters: sortChapterKeys(selections?.activeChapters || []),
       verseSelections: selections?.verseSelections || {},
       chapterIndex,
       chapterVerseCounts,
@@ -2185,9 +2248,9 @@ const storeChapterData = async (chapterKey, verses, source) => {
     });
   });
 
-  // Update in-memory chapter index
+  // Update in-memory chapter index with sorted verse IDs
   appState.chapterIndex[chapterKey] = {
-    verseIds,
+    verseIds: sortVerseIds(verseIds),
     lastUpdated: new Date().toISOString(),
     status: STATUS.READY,
   };
@@ -2350,7 +2413,8 @@ const handleChapterSelectionChange = () => {
     .map(([chapterKey]) => chapterKey);
 
   const combined = Array.from(new Set([...selectedChapters, ...verseSelectedChapters]));
-  appState.activeChapters = combined;
+  // Sort chapter keys numerically to ensure proper order (1, 2, 3... not 1, 10, 11, 2...)
+  appState.activeChapters = sortChapterKeys(combined);
 
   updateBookToggleStates();
   saveState();
@@ -2385,7 +2449,8 @@ const handleVerseSelectionChange = (changedChapterKey = null, changedBookKey = n
     .filter(([, selection]) => hasVerseSelection(selection))
     .map(([chapterKey]) => chapterKey);
 
-  appState.activeChapters = verseSelectedChapters;
+  // Sort chapter keys numerically to ensure proper order
+  appState.activeChapters = sortChapterKeys(verseSelectedChapters);
 
   // Clean up any verse selections that have no actual selection
   Object.keys(appState.verseSelections || {}).forEach((chapterKey) => {
