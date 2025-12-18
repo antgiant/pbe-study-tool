@@ -24,6 +24,9 @@ import {
   buildVerseDownloadPlan,
   isSelectionComplete,
   computeVerseStatus,
+  buildExclusionSetFromInclusions,
+  allowedVersesFromInclusions,
+  formatYearSelectionDescription,
 } from '../src/utils.js';
 
 describe('stripHtml', () => {
@@ -612,6 +615,63 @@ describe('verse download helpers', () => {
 
     expect(statusFailed).toBe(STATUS.ERROR);
     expect(statusOther).toBe(STATUS.PARTIAL);
+  });
+
+  it('buildExclusionSetFromInclusions should exclude verses outside allowed ranges', () => {
+    const exclusions = buildExclusionSetFromInclusions(10, [[3, 5]]);
+    expect(exclusions.has(1)).toBe(true);
+    expect(exclusions.has(3)).toBe(false);
+    expect(exclusions.has(6)).toBe(true);
+  });
+
+  it('allowedVersesFromInclusions should return sorted allowed verses', () => {
+    const allowed = allowedVersesFromInclusions(10, [[3, 5], [8, 9]]);
+    expect(allowed).toEqual([3, 4, 5, 8, 9]);
+  });
+
+  it('buildExclusionSetFromInclusions should match Joshua 15 listing (13-19 allowed)', () => {
+    // Joshua 15 has 63 verses; listing allows only 13-19
+    const exclusions = buildExclusionSetFromInclusions(63, [[13, 19]]);
+    expect(exclusions.has(12)).toBe(true);
+    expect(exclusions.has(13)).toBe(false);
+    expect(exclusions.has(19)).toBe(false);
+    expect(exclusions.has(20)).toBe(true);
+    expect(exclusions.size).toBe(63 - 7); // only 7 verses allowed
+  });
+
+  describe('formatYearSelectionDescription', () => {
+    const books = {
+      exodus: { id: 2, totalChapters: 40, label: 'Exodus' },
+      job: { id: 18, totalChapters: 42, label: 'Job' },
+    };
+
+    it('should display single chapter as Book #', () => {
+      const chaptersByYear = {
+        'year': [{ bookKey: 'exodus', start: 2, end: 2 }],
+      };
+      const desc = formatYearSelectionDescription('year', chaptersByYear, books);
+      expect(desc).toBe('Exodus 2');
+    });
+
+    it('should show verse inclusions', () => {
+      const chaptersByYear = {
+        'year': [{ bookKey: 'exodus', start: 2, end: 2, include: [[10, 30]] }],
+      };
+      const desc = formatYearSelectionDescription('year', chaptersByYear, books);
+      expect(desc).toBe('Exodus 2:10-30');
+    });
+
+    it('should format discontinuous selections naturally', () => {
+      const chaptersByYear = {
+        'year': [
+          { bookKey: 'job', start: 1, end: 1 },
+          { bookKey: 'job', start: 3, end: 4 },
+          { bookKey: 'job', start: 7, end: 7, include: [[1, 15]] },
+        ],
+      };
+      const desc = formatYearSelectionDescription('year', chaptersByYear, books);
+      expect(desc).toBe('Job 1, 3-4, 7:1-15');
+    });
   });
 });
 

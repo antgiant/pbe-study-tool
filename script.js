@@ -1063,6 +1063,67 @@ const books = {
 
 const chaptersByYear = {
   defaultYear: '2025-2026', // Default selection for new users
+  '2011-2012': [
+    { bookKey: '1samuel', start: 1, end: 31 },
+    { bookKey: 'mark', start: 1, end: 16 },
+  ],
+  '2012-2013': [
+    { bookKey: 'acts', start: 1, end: 28 },
+    { bookKey: '1thessalonians', start: 1, end: 5 },
+    { bookKey: '2thessalonians', start: 1, end: 3 },
+  ],
+  '2013-2014': [{ bookKey: '2samuel', start: 1, end: 24 }],
+  '2014-2015': [{ bookKey: 'matthew', start: 1, end: 28 }],
+  '2015-2016': [{ bookKey: 'exodus', start: 1, end: 40 }],
+  '2016-2017': [
+    { bookKey: 'galatians', start: 1, end: 6 },
+    { bookKey: 'ephesians', start: 1, end: 6 },
+    { bookKey: 'philippians', start: 1, end: 4 },
+    { bookKey: 'colossians', start: 1, end: 4 },
+    { bookKey: '1timothy', start: 1, end: 6 },
+    { bookKey: '2timothy', start: 1, end: 4 },
+  ],
+  '2017-2018': [
+    { bookKey: 'daniel', start: 1, end: 12 },
+    { bookKey: 'esther', start: 1, end: 10 },
+  ],
+  '2018-2019': [{ bookKey: 'luke', start: 1, end: 24 }],
+  '2019-2020': [
+    { bookKey: 'ezra', start: 1, end: 1 },
+    { bookKey: 'ezra', start: 3, end: 7 },
+    { bookKey: 'ezra', start: 8, end: 8, include: [[15, 36]] }, // Ezra 8:15–36
+    { bookKey: 'ezra', start: 9, end: 9 },
+    { bookKey: 'ezra', start: 10, end: 10, include: [[1, 17]] }, // Ezra 10:1–17
+    { bookKey: 'nehemiah', start: 1, end: 6 },
+    { bookKey: 'nehemiah', start: 7, end: 7, include: [[1, 6], [64, 73]] }, // Nehemiah 7:1–6, 64–73
+    { bookKey: 'nehemiah', start: 8, end: 9 },
+    { bookKey: 'nehemiah', start: 10, end: 10, include: [[28, 39]] }, // Nehemiah 10:28–39
+    { bookKey: 'nehemiah', start: 11, end: 11, include: [[1, 2]] }, // Nehemiah 11:1–2
+    { bookKey: 'nehemiah', start: 12, end: 12, include: [[27, 47]] }, // Nehemiah 12:27–47
+    { bookKey: 'nehemiah', start: 13, end: 13 },
+    { bookKey: 'hosea', start: 1, end: 14 },
+    { bookKey: 'amos', start: 1, end: 9 },
+    { bookKey: 'jonah', start: 1, end: 4 },
+    { bookKey: 'micah', start: 1, end: 7 },
+  ],
+  '2020-2021': [
+    { bookKey: 'hebrews', start: 1, end: 13 },
+    { bookKey: 'james', start: 1, end: 5 },
+    { bookKey: '1peter', start: 1, end: 5 },
+    { bookKey: '2peter', start: 1, end: 3 },
+  ],
+  '2021-2022': [
+    { bookKey: 'ruth', start: 1, end: 4 },
+    { bookKey: '1kings', start: 1, end: 22 },
+  ],
+  '2022-2023': [{ bookKey: 'john', start: 1, end: 21 }],
+  '2023-2024': [
+    { bookKey: 'joshua', start: 1, end: 12 },
+    { bookKey: 'joshua', start: 14, end: 14 },
+    { bookKey: 'joshua', start: 15, end: 15, include: [[13, 19]] }, // Joshua 15:13–19
+    { bookKey: 'joshua', start: 20, end: 24 },
+    { bookKey: 'judges', start: 1, end: 18 },
+  ],
   '2025-2026': [{ bookKey: 'isaiah', start: 1, end: 33 }],
   '2026-2027': [
     { bookKey: 'mark', start: 1, end: 16 },
@@ -1134,12 +1195,26 @@ const getSelectionsForYear = (year) => {
   if (year === FULL_BIBLE_KEY) return buildFullBibleSelections();
   const selections = chaptersByYear[year] || [];
   // Sort selections by book ID to ensure chapters appear in numerical order
-  return selections
+  const normalized = selections
     .map((sel) => ({
       ...sel,
       bookId: books[sel.bookKey]?.id || 0,
     }))
     .sort((a, b) => a.bookId - b.bookId);
+
+  // Collapse duplicate chapter entries (partial chapters) into a single entry for chapter view
+  const seen = new Set();
+  return normalized.filter((sel) => {
+    const { bookId, start, end } = sel;
+    for (let c = start; c <= end; c += 1) {
+      const key = `${bookId},${c}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        return true;
+      }
+    }
+    return false;
+  });
 };
 
 const defaultState = {
@@ -1149,6 +1224,7 @@ const defaultState = {
   activeVerseIds: [],
   verseSelections: {},
   chapterVerseCounts: {},
+  chapterExclusions: {},
   activeSelector: 'chapter',
   chapterIndex: {},
   verseBank: {},
@@ -1394,15 +1470,19 @@ const recomputeActiveVerseIds = () => {
     const ready = isSelectionComplete(selection, entry);
     if (!ready) return;
 
+    const exclusionSet = getChapterExclusions(chapterKey);
     if (!selection || selection.allSelected) {
-      ids.push(...entry.verseIds);
+      entry.verseIds.forEach((id) => {
+        const verseNumber = Number(id.split(',')[2]);
+        if (!exclusionSet.has(verseNumber)) ids.push(id);
+      });
       return;
     }
 
     const selectedSet = new Set(selection.selectedVerses || selection.verses || []);
     entry.verseIds.forEach((id) => {
       const verseNumber = Number(id.split(',')[2]);
-      if (selectedSet.has(verseNumber)) {
+      if (selectedSet.has(verseNumber) && !exclusionSet.has(verseNumber)) {
         ids.push(id);
       }
     });
@@ -1633,6 +1713,65 @@ const updateChapterIndicators = () => {
   updateVerseIndicators();
 };
 
+const formatYearSelectionDescription = (yearKey, yearSelections, bookMetaMap) => {
+  const selections = yearSelections[yearKey] || [];
+  const grouped = new Map();
+
+  const addPart = (bookLabel, part, isFullBook = false) => {
+    const entry = grouped.get(bookLabel) || { full: false, parts: [] };
+    if (entry.full) return;
+    if (isFullBook) {
+      entry.full = true;
+      entry.parts = [];
+    } else {
+      entry.parts.push(part);
+    }
+    grouped.set(bookLabel, entry);
+  };
+
+  selections.forEach((sel) => {
+    const bookMeta = bookMetaMap[sel.bookKey];
+    if (!bookMeta) return;
+    const bookLabel = bookMeta.label || sel.bookKey;
+    const totalChapters = bookMeta.totalChapters;
+    const { start, end } = sel;
+    const include = Array.isArray(sel.include) ? sel.include : null;
+
+    const coversWholeBook = !include && start === 1 && end === totalChapters;
+    if (coversWholeBook) {
+      addPart(bookLabel, '', true);
+      return;
+    }
+
+    if (include && start === end) {
+      const chapter = start;
+      const parts = include.map(([vStart, vEnd]) => {
+        if (vStart === vEnd) return `${chapter}:${vStart}`;
+        return `${chapter}:${vStart}-${vEnd}`;
+      });
+      addPart(bookLabel, parts.join(', '));
+      return;
+    }
+
+    if (start === end) {
+      addPart(bookLabel, `${start}`);
+    } else {
+      addPart(bookLabel, `${start}-${end}`);
+    }
+  });
+
+  const parts = [];
+  grouped.forEach((entry, bookLabel) => {
+    if (entry.full || entry.parts.length === 0) {
+      parts.push(`${bookLabel}`);
+    } else {
+      parts.push(`${bookLabel} ${entry.parts.join(', ')}`);
+    }
+  });
+
+  return parts.join('; ');
+};
+
 const renderYearOptions = (selectedYear = '') => {
   seasonSelect.innerHTML = '';
 
@@ -1641,21 +1780,9 @@ const renderYearOptions = (selectedYear = '') => {
   yearKeys.forEach((yearKey) => {
     const option = document.createElement('option');
     option.value = yearKey;
-    const parts = (getSelectionsForYear(yearKey) || [])
-      .map(({ bookKey, start, end }) => {
-        const meta = books[bookKey];
-        if (!meta) return null;
-        const cappedEnd = Math.min(end, meta.totalChapters);
-        const bookLabel = meta.label || bookKey;
-        // If the selection covers the whole book, show only the book name.
-        if (start === 1 && cappedEnd === meta.totalChapters) {
-          return `${bookLabel}`;
-        }
-        return `${bookLabel} ${start}-${cappedEnd}`;
-      })
-      .filter(Boolean);
-    const description = parts.length ? ` - ${parts.join('; ')}` : '';
-    option.textContent = `${yearKey}${description}`;
+    const description = formatYearSelectionDescription(yearKey, chaptersByYear, books);
+    const descriptionSuffix = description ? ` - ${description}` : '';
+    option.textContent = `${yearKey}${descriptionSuffix}`;
     option.selected = selectedYear === yearKey;
     seasonSelect.appendChild(option);
   });
@@ -1762,6 +1889,37 @@ const ensureVerseSelectionEntry = (chapterKey) => {
 const selectionHasAny = (chapterKey) => {
   const selection = appState.verseSelections?.[chapterKey];
   return hasVerseSelection(selection);
+};
+
+const buildExclusionSetFromInclusions = (totalVerses, includeRanges = []) => {
+  const allowed = new Set();
+  includeRanges.forEach(([start, end]) => {
+    for (let v = start; v <= end; v += 1) {
+      if (v >= 1 && v <= totalVerses) allowed.add(v);
+    }
+  });
+  const excluded = new Set();
+  for (let v = 1; v <= totalVerses; v += 1) {
+    if (!allowed.has(v)) excluded.add(v);
+  }
+  return excluded;
+};
+
+const applyYearExclusions = (yearKey) => {
+  const exclusions = {};
+  const selections = chaptersByYear[yearKey] || [];
+  selections.forEach((sel) => {
+    if (!Array.isArray(sel.include)) return;
+    if (sel.start !== sel.end) return; // include ranges only supported for single-chapter entries
+    const bookMeta = books[sel.bookKey];
+    if (!bookMeta) return;
+    const chapter = sel.start;
+    const total = bookMeta.verseCounts?.[chapter - 1];
+    if (!Number.isFinite(total)) return;
+    const chapterKey = `${bookMeta.id},${chapter}`;
+    exclusions[chapterKey] = Array.from(buildExclusionSetFromInclusions(total, sel.include));
+  });
+  appState.chapterExclusions = exclusions;
 };
 
 const buildVerseDownloadPlan = (activeChapters = [], verseSelections = {}) => {
@@ -2187,6 +2345,33 @@ const computeVerseCountFromData = (verseIds = [], existingCount, metaCount) => {
 
 const getChapterStatus = (chapterKey) => appState.chapterIndex[chapterKey]?.status || STATUS.NOT_DOWNLOADED;
 
+const getChapterExclusions = (chapterKey) => {
+  const list = appState.chapterExclusions?.[chapterKey] || [];
+  return new Set(Array.isArray(list) ? list : []);
+};
+
+const getChapterInclusions = (chapterKey) => {
+  const { bookId, chapter } = getChapterMeta(chapterKey);
+  const selections = chaptersByYear[appState.year] || [];
+  const matching = selections.find((sel) => {
+    const meta = books[sel.bookKey];
+    if (!meta || meta.id !== bookId) return false;
+    if (chapter < sel.start || chapter > sel.end) return false;
+    return Array.isArray(sel.include);
+  });
+  return matching?.include || null;
+};
+
+const allowedVersesFromInclusions = (totalVerses, includeRanges = []) => {
+  const allowed = new Set();
+  includeRanges.forEach(([start, end]) => {
+    for (let v = start; v <= end; v += 1) {
+      if (v >= 1 && v <= totalVerses) allowed.add(v);
+    }
+  });
+  return Array.from(allowed).sort((a, b) => a - b);
+};
+
 const getVerseNumbersForChapter = (chapterKey) => {
   const entry = appState.chapterIndex[chapterKey];
   const { bookId, chapter } = getChapterMeta(chapterKey);
@@ -2198,14 +2383,23 @@ const getVerseNumbersForChapter = (chapterKey) => {
   if (entry) {
     entry.verseCount = count || entry?.verseCount;
   }
+
+  const inclusionRanges = getChapterInclusions(chapterKey);
+  if (inclusionRanges && Number.isFinite(count) && count > 0) {
+    return allowedVersesFromInclusions(count, inclusionRanges);
+  }
+
+  const exclusionSet = getChapterExclusions(chapterKey);
+
   if (Number.isFinite(count) && count > 0) {
     appState.chapterVerseCounts[chapterKey] = count;
-    return Array.from({ length: count }, (_, idx) => idx + 1);
+    const verses = Array.from({ length: count }, (_, idx) => idx + 1);
+    return verses.filter((v) => !exclusionSet.has(v));
   }
 
   return verseIds
     .map((id) => Number(id.split(',')[2]))
-    .filter((num) => Number.isFinite(num));
+    .filter((num) => Number.isFinite(num) && !exclusionSet.has(num));
 };
 
 const hasVerseSelection = (selection) =>
@@ -3332,6 +3526,7 @@ const toggleChapterSelector = () => {
     startButton.disabled = true;
     // Clear active selections but preserve downloaded data
     appState.year = '';
+    appState.chapterExclusions = {};
     appState.activeChapters = [];
     appState.activeVerseIds = [];
     appState.verseSelections = {};
@@ -3342,6 +3537,7 @@ const toggleChapterSelector = () => {
   }
 
   appState.year = seasonSelect.value;
+  applyYearExclusions(appState.year);
   const selectedValues = new Set(appState.activeChapters || []);
   renderChapterOptions(seasonSelect.value, selectedValues);
   renderVerseOptions(seasonSelect.value, selectedValues);
@@ -3437,6 +3633,10 @@ const handleMaxPercentChange = (evt) => {
   // Apply default year for new users if no year is selected
   if (!appState.year && chaptersByYear.defaultYear) {
     appState.year = chaptersByYear.defaultYear;
+  }
+
+  if (appState.year) {
+    applyYearExclusions(appState.year);
   }
 
   activeSelector = appState.activeSelector === 'verse' ? 'verse' : 'chapter';

@@ -356,6 +356,109 @@ export const computeVerseStatus = ({
 };
 
 /**
+ * Formats selection descriptions for the year dropdown
+ * @param {string} yearKey
+ * @param {Object} chaptersByYear
+ * @param {Object} books
+ * @returns {string} description string (e.g., "Job 1, 3-4, 7:1-15; Exodus 2:10-30")
+ */
+export const formatYearSelectionDescription = (yearKey, chaptersByYear, books) => {
+  const selections = chaptersByYear[yearKey] || [];
+  const grouped = new Map();
+
+  const addPart = (bookLabel, part, isFullBook = false) => {
+    const entry = grouped.get(bookLabel) || { full: false, parts: [] };
+    if (entry.full) return;
+    if (isFullBook) {
+      entry.full = true;
+      entry.parts = [];
+    } else {
+      entry.parts.push(part);
+    }
+    grouped.set(bookLabel, entry);
+  };
+
+  selections.forEach((sel) => {
+    const bookMeta = books[sel.bookKey];
+    if (!bookMeta) return;
+    const bookLabel = bookMeta.label || sel.bookKey;
+    const totalChapters = bookMeta.totalChapters;
+    const { start, end } = sel;
+    const include = Array.isArray(sel.include) ? sel.include : null;
+
+    const coversWholeBook = !include && start === 1 && end === totalChapters;
+    if (coversWholeBook) {
+      addPart(bookLabel, '', true);
+      return;
+    }
+
+    if (include && start === end) {
+      const chapter = start;
+      const parts = include.map(([vStart, vEnd]) => {
+        if (vStart === vEnd) return `${chapter}:${vStart}`;
+        return `${chapter}:${vStart}-${vEnd}`;
+      });
+      addPart(bookLabel, parts.join(', '));
+      return;
+    }
+
+    if (start === end) {
+      addPart(bookLabel, `${start}`);
+    } else {
+      addPart(bookLabel, `${start}-${end}`);
+    }
+  });
+
+  const parts = [];
+  grouped.forEach((entry, bookLabel) => {
+    if (entry.full || entry.parts.length === 0) {
+      parts.push(`${bookLabel}`);
+    } else {
+      parts.push(`${bookLabel} ${entry.parts.join(', ')}`);
+    }
+  });
+
+  return parts.join('; ');
+};
+
+/**
+ * Builds an exclusion set from a list of allowed ranges (inclusive)
+ * @param {number} totalVerses - Total verses in the chapter
+ * @param {Array<[number, number]>} includeRanges - Allowed ranges (inclusive)
+ * @returns {Set<number>} Excluded verse numbers
+ */
+export const buildExclusionSetFromInclusions = (totalVerses, includeRanges = []) => {
+  const allowed = new Set();
+  includeRanges.forEach(([start, end]) => {
+    for (let v = start; v <= end; v += 1) {
+      if (v >= 1 && v <= totalVerses) allowed.add(v);
+    }
+  });
+
+  const excluded = new Set();
+  for (let v = 1; v <= totalVerses; v += 1) {
+    if (!allowed.has(v)) excluded.add(v);
+  }
+  return excluded;
+};
+
+/**
+ * Returns allowed verse numbers from inclusions
+ * @param {number} totalVerses
+ * @param {Array<[number, number]>} includeRanges
+ * @returns {number[]}
+ */
+export const allowedVersesFromInclusions = (totalVerses, includeRanges = []) => {
+  const allowed = new Set();
+  includeRanges.forEach(([start, end]) => {
+    for (let v = start; v <= end; v += 1) {
+      if (v >= 1 && v <= totalVerses) allowed.add(v);
+    }
+  });
+  return Array.from(allowed).sort((a, b) => a - b);
+};
+
+/**
  * Returns the chapterKey (bookId,chapter) for a verseId
  * @param {string} verseId - Verse ID in the form bookId,chapter,verse
  * @returns {string|null} chapterKey or null when invalid
