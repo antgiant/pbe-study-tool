@@ -1173,7 +1173,6 @@ const loadState = async () => {
     // Build chapterIndex from chapters
     const chapterIndex = {};
     const chapterVerseCounts = {};
-    const activeChapters = selections?.activeChapters || [];
 
     chapters.forEach(chapter => {
       chapterIndex[chapter.chapterKey] = {
@@ -1184,10 +1183,12 @@ const loadState = async () => {
       chapterVerseCounts[chapter.chapterKey] = chapter.verseCount;
     });
 
-    // Load verses only for active chapters (lazy loading)
+    // Load verses for all downloaded chapters (not just active ones)
+    // This ensures that downloaded chapters remain downloaded even when unselected
     const verseBank = {};
-    if (activeChapters.length > 0) {
-      const verses = await getVersesByChapters(activeChapters);
+    const downloadedChapters = Object.keys(chapterIndex);
+    if (downloadedChapters.length > 0) {
+      const verses = await getVersesByChapters(downloadedChapters);
       verses.forEach(verse => {
         verseBank[verse.verseId] = {
           bookId: verse.bookId,
