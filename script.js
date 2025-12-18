@@ -37,6 +37,7 @@ const STATUS = {
   DOWNLOADING: 'downloading',
   ERROR: 'error',
   NOT_DOWNLOADED: 'not-downloaded',
+  PARTIAL: 'partial', // Some verses downloaded, but not the full chapter
 };
 const STATE_OF_BEING_WORDS = ['am', 'is', 'are', 'was', 'were', 'be', 'being', 'been'];
 const TFIDF_CONFIG = {
@@ -1151,6 +1152,7 @@ const defaultState = {
   activeSelector: 'chapter',
   chapterIndex: {},
   verseBank: {},
+  verseErrors: {},
   minBlanks: 1,
   maxBlanks: 1,
   tfidfCache: {
@@ -1386,29 +1388,24 @@ const recomputeActiveVerseIds = () => {
   const ids = [];
   appState.activeChapters.forEach((chapterKey) => {
     const entry = appState.chapterIndex[chapterKey];
-    if (entry && entry.status === STATUS.READY && entry.verseIds?.length) {
-      const selection = appState.verseSelections?.[chapterKey];
-      // If selection exists and allSelected is true, include all verses
-      // If selection exists with specific verses, include only those
-      // If no selection exists, include all verses (chapter was selected in chapter mode)
-      if (selection) {
-        if (selection.allSelected) {
-          ids.push(...entry.verseIds);
-        } else if (selection.selectedVerses && selection.selectedVerses.length > 0) {
-          const selectedSet = new Set(selection.selectedVerses);
-          entry.verseIds.forEach((id) => {
-            const verseNumber = Number(id.split(',')[2]);
-            if (selectedSet.has(verseNumber)) {
-              ids.push(id);
-            }
-          });
-        }
-        // If selection exists but has no verses selected, don't include any
-      } else {
-        // No selection object means chapter was selected in chapter mode - include all verses
-        ids.push(...entry.verseIds);
-      }
+    if (!entry || !entry.verseIds?.length) return;
+
+    const selection = appState.verseSelections?.[chapterKey];
+    const ready = isSelectionComplete(selection, entry);
+    if (!ready) return;
+
+    if (!selection || selection.allSelected) {
+      ids.push(...entry.verseIds);
+      return;
     }
+
+    const selectedSet = new Set(selection.selectedVerses || selection.verses || []);
+    entry.verseIds.forEach((id) => {
+      const verseNumber = Number(id.split(',')[2]);
+      if (selectedSet.has(verseNumber)) {
+        ids.push(id);
+      }
+    });
   });
   appState.activeVerseIds = ids;
 };
@@ -1580,7 +1577,8 @@ const updateStartState = () => {
     appState.activeChapters.length > 0 &&
     appState.activeChapters.every((chapterKey) => {
       const entry = appState.chapterIndex[chapterKey];
-      return entry && entry.status === STATUS.READY && entry.verseIds && entry.verseIds.length > 0;
+      const selection = appState.verseSelections?.[chapterKey];
+      return entry && isSelectionComplete(selection, entry);
     });
   const hasVerses = appState.activeVerseIds.length > 0;
   startButton.disabled = !anySelected || anyDownloads || !allReady || !hasVerses;
@@ -1766,6 +1764,61 @@ const selectionHasAny = (chapterKey) => {
   return hasVerseSelection(selection);
 };
 
+const buildVerseDownloadPlan = (activeChapters = [], verseSelections = {}) => {
+  const chapterDownloads = [];
+  const verseDownloads = [];
+
+  activeChapters.forEach((chapterKey) => {
+    const selection = verseSelections[chapterKey];
+    if (selection?.allSelected) {
+      chapterDownloads.push(chapterKey);
+      return;
+    }
+
+    if (hasVerseSelection(selection)) {
+      (selection.selectedVerses || []).forEach((verseNumber) => {
+        verseDownloads.push(`${chapterKey},${verseNumber}`);
+      });
+    }
+  });
+
+  return { chapterDownloads, verseDownloads };
+};
+
+const verseStatusFor = (chapterKey, verseId) => {
+  const chapterStatus = getChapterStatus(chapterKey);
+  if (appState.verseErrors[verseId]) return STATUS.ERROR;
+  const inFlight = downloadsInFlight.has(verseId) || downloadsInFlight.has(chapterKey);
+  if (inFlight) return STATUS.DOWNLOADING;
+  if (appState.verseBank[verseId]) return STATUS.READY;
+  return chapterStatus;
+};
+
+const isSelectionComplete = (selection, entry) => {
+  const verseIds = entry?.verseIds || [];
+  const status = entry?.status;
+  const verseCount = entry?.verseCount;
+
+  const downloaded = new Set(
+    verseIds
+      .map((id) => Number(id?.split?.(',')?.[2]))
+      .filter((n) => Number.isFinite(n))
+  );
+
+  if (!selection || selection.allSelected === true || selection.all === true) {
+    if (status !== STATUS.READY) return false;
+    if (downloaded.size === 0) return false;
+    if (Number.isFinite(verseCount)) {
+      return downloaded.size >= verseCount;
+    }
+    return true;
+  }
+
+  const selected = selection.selectedVerses || selection.verses || [];
+  if (!selected.length) return false;
+  return selected.every((v) => downloaded.has(v));
+};
+
 const renderVerseOptions = (year, selectedValues = new Set()) => {
   verseOptionsContainer.innerHTML = '';
   verseBookToggleMap = new Map();
@@ -1861,8 +1914,9 @@ const renderVerseOptions = (year, selectedValues = new Set()) => {
           number.textContent = verseNum;
 
           const verseStatus = document.createElement('span');
-          verseStatus.className = `chapter-status${status ? ` ${status}` : ''}`;
-          verseStatus.textContent = statusLabelFor(status);
+          const currentStatus = verseStatusFor(chapterKey, verseId);
+          verseStatus.className = `chapter-status${currentStatus ? ` ${currentStatus}` : ''}`;
+          verseStatus.textContent = statusLabelFor(currentStatus);
 
           verseLabel.appendChild(input);
           verseLabel.appendChild(number);
@@ -1874,19 +1928,23 @@ const renderVerseOptions = (year, selectedValues = new Set()) => {
 
           input.addEventListener('change', () => {
             ensureVerseSelectionEntry(chapterKey);
-            const selectionEntry = appState.verseSelections[chapterKey];
-            const set = new Set(selectionEntry.selectedVerses || []);
-            if (input.checked) {
-              set.add(verseNum);
-            } else {
-              set.delete(verseNum);
-            }
-            if (verseNumbers.length > 0 && set.size === verseNumbers.length) {
-              selectionEntry.allSelected = true;
-              selectionEntry.selectedVerses = [];
-            } else {
-              selectionEntry.allSelected = false;
-              selectionEntry.selectedVerses = Array.from(set);
+        const selectionEntry = appState.verseSelections[chapterKey];
+        const set = new Set(selectionEntry.selectedVerses || []);
+        if (input.checked) {
+          set.add(verseNum);
+        } else {
+          set.delete(verseNum);
+        }
+        const totalVerses = verseNumbers.length;
+        const chapterStatus = getChapterStatus(chapterKey);
+        const hasCompleteSelection =
+          totalVerses > 0 && set.size === totalVerses && chapterStatus === STATUS.READY;
+        if (hasCompleteSelection) {
+          selectionEntry.allSelected = true;
+          selectionEntry.selectedVerses = [];
+        } else {
+          selectionEntry.allSelected = false;
+          selectionEntry.selectedVerses = Array.from(set);
             }
             handleVerseSelectionChange(chapterKey, bookKey);
             updateChapterToggleState(chapterKey);
@@ -2023,14 +2081,19 @@ const updateVerseToggleStates = () => {
 
 const updateVerseIndicators = () => {
   verseChapterToggleMap.forEach(({ statusSpan, verseStatusEls, chapterKey }) => {
-    const status = getChapterStatus(chapterKey);
-    const label = statusLabelFor(status);
+    const chapterStatus = getChapterStatus(chapterKey);
+    const chapterLabel = statusLabelFor(chapterStatus);
+
     if (statusSpan) {
-      statusSpan.textContent = label;
-      statusSpan.className = `chapter-status${status ? ` ${status}` : ''}`;
+      statusSpan.textContent = chapterLabel;
+      statusSpan.className = `chapter-status${chapterStatus ? ` ${chapterStatus}` : ''}`;
     }
     if (verseStatusEls) {
-      verseStatusEls.forEach((el) => {
+      verseStatusEls.forEach((el, idx) => {
+        const verseNum = verseChapterToggleMap.get(chapterKey)?.verseNumbers?.[idx];
+        const verseId = Number.isFinite(verseNum) ? `${chapterKey},${verseNum}` : null;
+        const status = verseId ? verseStatusFor(chapterKey, verseId) : chapterStatus;
+        const label = statusLabelFor(status);
         el.textContent = label;
         el.className = `chapter-status${status ? ` ${status}` : ''}`;
       });
@@ -2041,15 +2104,19 @@ const updateVerseIndicators = () => {
 const updateVerseStatusForChapter = (chapterKey) => {
   const entry = verseChapterToggleMap.get(chapterKey);
   if (!entry) return;
-  const status = getChapterStatus(chapterKey);
-  const label = statusLabelFor(status);
-  const { statusSpan, verseStatusEls } = entry;
+  const chapterStatus = getChapterStatus(chapterKey);
+  const { statusSpan, verseStatusEls, verseNumbers } = entry;
+  const chapterLabel = statusLabelFor(chapterStatus);
   if (statusSpan) {
-    statusSpan.textContent = label;
-    statusSpan.className = `chapter-status${status ? ` ${status}` : ''}`;
+    statusSpan.textContent = chapterLabel;
+    statusSpan.className = `chapter-status${chapterStatus ? ` ${chapterStatus}` : ''}`;
   }
-  if (verseStatusEls) {
-    verseStatusEls.forEach((el) => {
+  if (verseStatusEls && verseNumbers) {
+    verseStatusEls.forEach((el, idx) => {
+      const verseNum = verseNumbers[idx];
+      const verseId = Number.isFinite(verseNum) ? `${chapterKey},${verseNum}` : null;
+      const status = verseId ? verseStatusFor(chapterKey, verseId) : chapterStatus;
+      const label = statusLabelFor(status);
       el.textContent = label;
       el.className = `chapter-status${status ? ` ${status}` : ''}`;
     });
@@ -2088,26 +2155,57 @@ const getChapterMeta = (chapterKey) => {
   return { bookId, chapter };
 };
 
+const getMetaVerseCount = (bookId, chapter) => {
+  const bookMeta = Object.values(books).find((b) => b.id === bookId);
+  const count = bookMeta?.verseCounts?.[chapter - 1];
+  return Number.isFinite(count) && count > 0 ? count : null;
+};
+
+const getChapterKeyFromVerseId = (verseId) => {
+  if (!verseId) return null;
+  const [bookIdStr, chapterStr] = verseId.split(',');
+  const bookId = Number(bookIdStr);
+  const chapter = Number(chapterStr);
+  if (!Number.isFinite(bookId) || !Number.isFinite(chapter)) return null;
+  return `${bookId},${chapter}`;
+};
+
+const computeVerseCountFromData = (verseIds = [], existingCount, metaCount) => {
+  const numbers = verseIds
+    .map((id) => Number(id?.split?.(',')?.[2]))
+    .filter((n) => Number.isFinite(n));
+  const observedMax = numbers.length ? Math.max(...numbers) : 0;
+  const observedCount = numbers.length > 0 ? observedMax : 0;
+
+  const candidates = [existingCount, metaCount, observedCount]
+    .map((n) => (Number.isFinite(n) && n > 0 ? n : null))
+    .filter((n) => n !== null);
+
+  if (candidates.length === 0) return null;
+  return Math.max(...candidates);
+};
+
 const getChapterStatus = (chapterKey) => appState.chapterIndex[chapterKey]?.status || STATUS.NOT_DOWNLOADED;
 
 const getVerseNumbersForChapter = (chapterKey) => {
   const entry = appState.chapterIndex[chapterKey];
-  if (entry?.verseIds?.length) {
-    return entry.verseIds
-      .map((id) => Number(id.split(',')[2]))
-      .filter((num) => Number.isFinite(num));
-  }
-  const cached = appState.chapterVerseCounts?.[chapterKey];
-  if (cached && Number.isFinite(cached) && cached > 0) {
-    return Array.from({ length: cached }, (_, idx) => idx + 1);
-  }
   const { bookId, chapter } = getChapterMeta(chapterKey);
-  const bookMeta = Object.values(books).find((b) => b.id === bookId);
-  const count = bookMeta?.verseCounts?.[chapter - 1];
+  const metaCount = getMetaVerseCount(bookId, chapter);
+  const cached = appState.chapterVerseCounts?.[chapterKey];
+  const verseIds = entry?.verseIds || [];
+  const count = computeVerseCountFromData(verseIds, entry?.verseCount ?? cached, metaCount);
+
+  if (entry) {
+    entry.verseCount = count || entry?.verseCount;
+  }
   if (Number.isFinite(count) && count > 0) {
+    appState.chapterVerseCounts[chapterKey] = count;
     return Array.from({ length: count }, (_, idx) => idx + 1);
   }
-  return [];
+
+  return verseIds
+    .map((id) => Number(id.split(',')[2]))
+    .filter((num) => Number.isFinite(num));
 };
 
 const hasVerseSelection = (selection) =>
@@ -2302,6 +2400,24 @@ const parseVerses = (data) => {
       }))
       .filter((v) => Number.isFinite(v.verse) && v.text);
   }
+
+  // Some endpoints (like get-verse) return a single object instead of a list/verses hash
+  if (typeof data === 'object') {
+    // Prefer explicit numeric verse fields so textual "verse" data doesn't get coerced to NaN
+    const verseNumber = Number(data.verse_nr ?? data.nr ?? data.verse);
+    // Prefer explicit text fields; fall back to the verse field only when it's not numeric
+    const verseText =
+      data.text ||
+      data.text_nr ||
+      data.text_clean ||
+      data.content ||
+      (typeof data.verse === 'string' && !/^\d+$/.test(data.verse) ? data.verse : '');
+
+    if (Number.isFinite(verseNumber) && verseText) {
+      return [{ verse: verseNumber, text: verseText }];
+    }
+  }
+
   return [];
 };
 
@@ -2336,6 +2452,144 @@ const fetchChapter = async (chapterKey) => {
     throw new Error(`Failed to fetch ${chapterKey}: ${response.status}`);
   }
   return response.json();
+};
+
+const fetchVerse = async (verseId) => {
+  const [bookId, chapter, verse] = verseId.split(',').map(Number);
+  const url = `https://bolls.life/get-verse/NKJV/${bookId}/${chapter}/${verse}/`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ${verseId}: ${response.status}`);
+  }
+  return response.json();
+};
+
+const storeVerseData = async (verseId, text, source) => {
+  try {
+    const [bookId, chapter, verse] = verseId.split(',').map(Number);
+    const chapterKey = `${bookId},${chapter}`;
+    const metaCount = getMetaVerseCount(bookId, chapter);
+
+    // Pre-calculate term frequency for TF-IDF
+    const plainText = stripHtml(text);
+    const words = tokenizeText(plainText);
+    const termFrequency = calculateTermFrequency(words);
+    const wordList = Array.from(new Set(words));
+
+    // Update in-memory state
+    appState.verseBank[verseId] = {
+      bookId,
+      chapter,
+      verse,
+      text,
+      source,
+      termFrequency,
+      wordList,
+    };
+
+    // Save verse to IndexedDB
+    await saveVerse({
+      verseId,
+      chapterKey,
+      bookId,
+      chapter,
+      verse,
+      text,
+      source,
+      termFrequency,
+      wordList,
+      downloadedAt: new Date().toISOString()
+    });
+
+    // Update chapter index to include this verse
+    if (!appState.chapterIndex[chapterKey]) {
+      appState.chapterIndex[chapterKey] = {
+        verseIds: [],
+        lastUpdated: new Date().toISOString(),
+        status: STATUS.PARTIAL
+      };
+    }
+
+    if (!appState.chapterIndex[chapterKey].verseIds.includes(verseId)) {
+      appState.chapterIndex[chapterKey].verseIds.push(verseId);
+      appState.chapterIndex[chapterKey].verseIds = sortVerseIds(appState.chapterIndex[chapterKey].verseIds);
+    }
+
+    appState.chapterIndex[chapterKey].lastUpdated = new Date().toISOString();
+    const computedCount = computeVerseCountFromData(
+      appState.chapterIndex[chapterKey].verseIds,
+      appState.chapterIndex[chapterKey].verseCount,
+      metaCount
+    );
+    if (Number.isFinite(computedCount) && computedCount > 0) {
+      appState.chapterIndex[chapterKey].verseCount = computedCount;
+      appState.chapterVerseCounts[chapterKey] = computedCount;
+    }
+
+    // Save chapter metadata
+    await saveChapter({
+      chapterKey,
+      bookId,
+      chapter,
+      status: appState.chapterIndex[chapterKey].status || STATUS.PARTIAL,
+      lastUpdated: appState.chapterIndex[chapterKey].lastUpdated,
+      verseCount: appState.chapterIndex[chapterKey].verseCount || appState.chapterIndex[chapterKey].verseIds.length
+    });
+
+    return { verseId, text };
+  } catch (err) {
+    console.error('Error saving verse data:', err);
+    throw err;
+  }
+};
+
+const downloadVerseIfNeeded = (verseId) => {
+  // Check if verse is already downloaded
+  if (appState.verseBank[verseId]) {
+    return Promise.resolve();
+  }
+
+  if (downloadsInFlight.has(verseId)) {
+    return downloadsInFlight.get(verseId);
+  }
+
+  const chapterKey = getChapterKeyFromVerseId(verseId);
+  delete appState.verseErrors[verseId];
+
+  const downloadPromise = fetchVerse(verseId)
+    .then(async (data) => {
+      const verses = parseVerses(data);
+      if (!verses.length || !verses[0].text) {
+        appState.verseErrors[verseId] = true;
+        throw new Error(`No text found for ${verseId}`);
+      }
+      await storeVerseData(verseId, verses[0].text, 'NKJV');
+      delete appState.verseErrors[verseId];
+      if (chapterKey) {
+        const currentStatus = appState.chapterIndex[chapterKey]?.status;
+        const nextStatus = currentStatus === STATUS.READY ? STATUS.READY : STATUS.PARTIAL;
+        markChapterStatus(chapterKey, nextStatus);
+      }
+      recomputeActiveVerseIds();
+      saveState();
+      updateStartState();
+    })
+    .catch((err) => {
+      console.warn(err);
+      appState.verseErrors[verseId] = true;
+      // Don't uncheck on individual verse errors
+    })
+    .finally(() => {
+      downloadsInFlight.delete(verseId);
+      updateStartState();
+      updateChapterIndicators();
+      updateVerseIndicators();
+    });
+
+  downloadsInFlight.set(verseId, downloadPromise);
+  updateStartState();
+  updateVerseIndicators();
+  return downloadPromise;
 };
 
 const downloadChapterIfNeeded = (chapterKey) => {
@@ -2382,11 +2636,19 @@ const downloadChapterIfNeeded = (chapterKey) => {
 const startDownloadsForSelection = () => {
   const needed = appState.activeChapters.filter((chapterKey) => {
     const entry = appState.chapterIndex[chapterKey];
-    return !(entry && entry.status === STATUS.READY && entry.verseIds?.length);
+    const selection = appState.verseSelections?.[chapterKey];
+    return shouldDownloadFullChapter(selection, entry);
   });
   needed.forEach((chapterKey) => {
     downloadChapterIfNeeded(chapterKey);
   });
+};
+
+const startVerseDownloadsForSelection = () => {
+  const plan = buildVerseDownloadPlan(appState.activeChapters, appState.verseSelections || {});
+
+  plan.chapterDownloads.forEach((chapterKey) => downloadChapterIfNeeded(chapterKey));
+  plan.verseDownloads.forEach((verseId) => downloadVerseIfNeeded(verseId));
 };
 
 const handleChapterSelectionChange = () => {
@@ -2394,11 +2656,13 @@ const handleChapterSelectionChange = () => {
   const selectedSet = new Set(selectedChapters);
 
   // For newly selected chapters, create allSelected entry if no verse selection exists
-  selectedChapters.forEach((chapterKey) => {
-    if (!appState.verseSelections[chapterKey]) {
-      appState.verseSelections[chapterKey] = { allSelected: true, selectedVerses: [] };
-    }
-  });
+  if (appState.activeSelector === 'chapter') {
+    selectedChapters.forEach((chapterKey) => {
+      if (!appState.verseSelections[chapterKey]) {
+        appState.verseSelections[chapterKey] = { allSelected: true, selectedVerses: [] };
+      }
+    });
+  }
 
   // Remove verse selections for unchecked chapters
   Object.keys(appState.verseSelections || {}).forEach((chapterKey) => {
@@ -2407,18 +2671,23 @@ const handleChapterSelectionChange = () => {
     }
   });
 
-  // Combine chapters selected in chapter mode with those having verse selections
-  const verseSelectedChapters = Object.entries(appState.verseSelections || {})
-    .filter(([, selection]) => hasVerseSelection(selection))
-    .map(([chapterKey]) => chapterKey);
-
-  const combined = Array.from(new Set([...selectedChapters, ...verseSelectedChapters]));
-  // Sort chapter keys numerically to ensure proper order (1, 2, 3... not 1, 10, 11, 2...)
-  appState.activeChapters = sortChapterKeys(combined);
+  // Derive active chapters based on current selector mode
+  if (appState.activeSelector === 'chapter') {
+    appState.activeChapters = sortChapterKeys(selectedChapters);
+  } else {
+    const verseSelectedChapters = Object.entries(appState.verseSelections || {})
+      .filter(([, selection]) => hasVerseSelection(selection))
+      .map(([chapterKey]) => chapterKey);
+    appState.activeChapters = sortChapterKeys(verseSelectedChapters);
+  }
 
   updateBookToggleStates();
   saveState();
-  startDownloadsForSelection();
+  if (appState.activeSelector === 'chapter') {
+    startDownloadsForSelection();
+  } else {
+    startVerseDownloadsForSelection();
+  }
   updateStartState();
   syncVerseSelectorToState();
   updateVerseToggleStates();
@@ -2461,7 +2730,7 @@ const handleVerseSelectionChange = (changedChapterKey = null, changedBookKey = n
   });
 
   saveState();
-  startDownloadsForSelection();
+  startVerseDownloadsForSelection(); // Use verse-level downloads for verse selector
   recomputeActiveVerseIds();
   updateStartState();
   syncChapterSelectorToState();

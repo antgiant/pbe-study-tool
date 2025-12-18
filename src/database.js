@@ -309,7 +309,10 @@ export const getVersesByChapter = async (chapterKey) => {
       const request = index.getAll(chapterKey);
       request.onsuccess = () => {
         db.close();
-        resolve(request.result || []);
+        const verses = request.result || [];
+        // Sort verses numerically by verse number
+        verses.sort((a, b) => a.verse - b.verse);
+        resolve(verses);
       };
       request.onerror = () => {
         db.close();

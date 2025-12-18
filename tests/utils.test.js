@@ -16,6 +16,14 @@ import {
   STATUS,
   STATE_OF_BEING_WORDS,
   TFIDF_CONFIG,
+  chapterKeyFromVerseId,
+  nextChapterStatusForVerseDownload,
+  getMetaVerseCount,
+  computeVerseCount,
+  buildVerseNumbers,
+  buildVerseDownloadPlan,
+  isSelectionComplete,
+  computeVerseStatus,
 } from '../src/utils.js';
 
 describe('stripHtml', () => {
@@ -403,6 +411,25 @@ describe('parseVerses', () => {
     expect(result).toEqual([]);
   });
 
+  it('should handle single verse response objects', () => {
+    const data = {
+      book_id: 23,
+      chapter: 5,
+      verse_nr: '2',
+      verse: 'He shall feed His flock like a shepherd',
+    };
+
+    const result = parseVerses(data);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual({
+      bookId: 23,
+      chapter: 5,
+      verse: 2,
+      text: 'He shall feed His flock like a shepherd',
+      verseId: '23,5,2',
+    });
+  });
+
   it('should filter out invalid items', () => {
     const data = [
       {
@@ -433,6 +460,161 @@ describe('parseVerses', () => {
   });
 });
 
+describe('verse download helpers', () => {
+  it('chapterKeyFromVerseId should return chapter key when valid', () => {
+    expect(chapterKeyFromVerseId('23,5,2')).toBe('23,5');
+    expect(chapterKeyFromVerseId('1,1,1')).toBe('1,1');
+  });
+
+  it('chapterKeyFromVerseId should return null for invalid ids', () => {
+    expect(chapterKeyFromVerseId('')).toBeNull();
+    expect(chapterKeyFromVerseId('abc')).toBeNull();
+    expect(chapterKeyFromVerseId('1')).toBeNull();
+    expect(chapterKeyFromVerseId('1,foo,3')).toBeNull();
+  });
+
+  it('nextChapterStatusForVerseDownload should track status transitions', () => {
+    expect(nextChapterStatusForVerseDownload(undefined, 'start')).toBe(STATUS.DOWNLOADING);
+    expect(nextChapterStatusForVerseDownload(STATUS.NOT_DOWNLOADED, 'success')).toBe(STATUS.PARTIAL);
+    expect(nextChapterStatusForVerseDownload(STATUS.PARTIAL, 'success')).toBe(STATUS.PARTIAL);
+    expect(nextChapterStatusForVerseDownload(STATUS.READY, 'success')).toBe(STATUS.READY);
+    expect(nextChapterStatusForVerseDownload(STATUS.DOWNLOADING, 'error')).toBe(STATUS.ERROR);
+  });
+
+  it('getMetaVerseCount should read verse count from book metadata', () => {
+    const books = {
+      isaiah: { id: 23, verseCounts: [31, 22, 26, 6, 30] }, // truncated
+    };
+
+    expect(getMetaVerseCount(books, 23, 1)).toBe(31);
+    expect(getMetaVerseCount(books, 23, 5)).toBe(30);
+    expect(getMetaVerseCount(books, 99, 1)).toBeNull();
+  });
+
+  it('computeVerseCount should prefer meta count over observed partials', () => {
+    const verseIds = ['23,5,2'];
+    expect(computeVerseCount(verseIds, null, 30)).toBe(30);
+  });
+
+  it('computeVerseCount should use existing count when larger than observed', () => {
+    const verseIds = ['23,5,2', '23,5,3'];
+    expect(computeVerseCount(verseIds, 50, null)).toBe(50);
+  });
+
+  it('buildVerseNumbers should produce full range from meta count', () => {
+    const verseIds = ['23,5,2'];
+    const numbers = buildVerseNumbers(verseIds, null, 4);
+    expect(numbers).toEqual([1, 2, 3, 4]);
+  });
+
+  it('buildVerseNumbers should fall back to observed verses when no count available', () => {
+    const verseIds = ['23,5,2', '23,5,4'];
+    const numbers = buildVerseNumbers(verseIds, null, null);
+    expect(numbers).toEqual([1, 2, 3, 4]);
+  });
+
+  it('buildVerseDownloadPlan should include only selected verses when not allSelected', () => {
+    const plan = buildVerseDownloadPlan(['23,5'], {
+      '23,5': { allSelected: false, selectedVerses: [2] },
+    });
+
+    expect(plan.chapterDownloads).toEqual([]);
+    expect(plan.verseDownloads).toEqual(['23,5,2']);
+  });
+
+  it('buildVerseDownloadPlan should include chapter when allSelected', () => {
+    const plan = buildVerseDownloadPlan(['23,5'], {
+      '23,5': { allSelected: true, selectedVerses: [] },
+    });
+
+    expect(plan.chapterDownloads).toEqual(['23,5']);
+    expect(plan.verseDownloads).toEqual([]);
+  });
+
+  it('isSelectionComplete should require full chapter when allSelected', () => {
+    const verseIds = ['23,5,1', '23,5,2', '23,5,3'];
+    expect(isSelectionComplete({ allSelected: true }, verseIds, STATUS.PARTIAL, 3)).toBe(false);
+    expect(isSelectionComplete({ allSelected: true }, verseIds, STATUS.READY, 3)).toBe(true);
+  });
+
+  it('isSelectionComplete should validate individual verse selections', () => {
+    const verseIds = ['23,5,2'];
+    const selection = { selectedVerses: [2] };
+    expect(isSelectionComplete(selection, verseIds, STATUS.PARTIAL)).toBe(true);
+    expect(isSelectionComplete(selection, [], STATUS.PARTIAL)).toBe(false);
+  });
+
+  it('computeVerseStatus should show downloading for in-flight verse only', () => {
+    const downloads = new Map([['23,5,2', Promise.resolve()]]);
+    const status = computeVerseStatus({
+      verseId: '23,5,2',
+      chapterKey: '23,5',
+      downloadsInFlight: downloads,
+      verseBank: {},
+      chapterStatus: STATUS.NOT_DOWNLOADED,
+    });
+    expect(status).toBe(STATUS.DOWNLOADING);
+  });
+
+  it('computeVerseStatus should return READY when verse downloaded even if chapter partial', () => {
+    const verseBank = { '23,5,2': { text: '...' } };
+    const status = computeVerseStatus({
+      verseId: '23,5,2',
+      chapterKey: '23,5',
+      downloadsInFlight: new Map(),
+      verseBank,
+      chapterStatus: STATUS.PARTIAL,
+    });
+    expect(status).toBe(STATUS.READY);
+  });
+
+  it('computeVerseStatus should fall back to chapter status for other verses', () => {
+    const status = computeVerseStatus({
+      verseId: '23,5,3',
+      chapterKey: '23,5',
+      downloadsInFlight: new Map(),
+      verseBank: { '23,5,2': { text: '...' } },
+      chapterStatus: STATUS.PARTIAL,
+    });
+    expect(status).toBe(STATUS.PARTIAL);
+  });
+
+  it('computeVerseStatus should not mark other verses as downloading for single in-flight verse', () => {
+    const downloads = new Map([['23,5,2', Promise.resolve()]]);
+    const status = computeVerseStatus({
+      verseId: '23,5,3',
+      chapterKey: '23,5',
+      downloadsInFlight: downloads,
+      verseBank: {},
+      chapterStatus: STATUS.PARTIAL,
+    });
+    expect(status).toBe(STATUS.PARTIAL);
+  });
+
+  it('computeVerseStatus should show error for only the failed verse', () => {
+    const verseErrors = { '23,5,2': true };
+    const statusFailed = computeVerseStatus({
+      verseId: '23,5,2',
+      chapterKey: '23,5',
+      downloadsInFlight: new Map(),
+      verseBank: {},
+      chapterStatus: STATUS.PARTIAL,
+      verseErrors,
+    });
+    const statusOther = computeVerseStatus({
+      verseId: '23,5,3',
+      chapterKey: '23,5',
+      downloadsInFlight: new Map(),
+      verseBank: {},
+      chapterStatus: STATUS.PARTIAL,
+      verseErrors,
+    });
+
+    expect(statusFailed).toBe(STATUS.ERROR);
+    expect(statusOther).toBe(STATUS.PARTIAL);
+  });
+});
+
 describe('Constants', () => {
   it('should have correct STATUS values', () => {
     expect(STATUS).toEqual({
@@ -440,6 +622,7 @@ describe('Constants', () => {
       DOWNLOADING: 'downloading',
       ERROR: 'error',
       NOT_DOWNLOADED: 'not-downloaded',
+      PARTIAL: 'partial',
     });
   });
 

@@ -8,6 +8,7 @@ export const STATUS = {
   DOWNLOADING: 'downloading',
   ERROR: 'error',
   NOT_DOWNLOADED: 'not-downloaded',
+  PARTIAL: 'partial',
 };
 
 export const STATE_OF_BEING_WORDS = ['am', 'is', 'are', 'was', 'were', 'be', 'being', 'been'];
@@ -195,7 +196,192 @@ export const randomPointsValue = (verseId, verseBank, minBlanks, maxBlanks, maxB
  */
 export const hasVerseSelection = (selection) => {
   if (!selection) return false;
-  return Boolean(selection.all === true || (selection.verses && selection.verses.length > 0));
+  const allFlag = selection.all === true || selection.allSelected === true;
+  const versesArray = selection.verses || selection.selectedVerses;
+  return Boolean(allFlag || (versesArray && versesArray.length > 0));
+};
+
+/**
+ * Returns the total verse count for a chapter using meta data
+ * @param {Object} books - Books map
+ * @param {number} bookId - Book ID
+ * @param {number} chapter - Chapter number (1-based)
+ * @returns {number|null} Verse count or null if unknown
+ */
+export const getMetaVerseCount = (books, bookId, chapter) => {
+  if (!books || !Number.isFinite(bookId) || !Number.isFinite(chapter)) return null;
+  const bookMeta = Object.values(books).find((b) => b.id === bookId);
+  const count = bookMeta?.verseCounts?.[chapter - 1];
+  return Number.isFinite(count) && count > 0 ? count : null;
+};
+
+/**
+ * Computes the most reliable verse count for a chapter
+ * @param {string[]} verseIds - Array of verseIds (book,chapter,verse)
+ * @param {number|null|undefined} existingCount - Existing stored count
+ * @param {number|null|undefined} metaCount - Count from meta data
+ * @returns {number|null} Total verse count if known
+ */
+export const computeVerseCount = (verseIds = [], existingCount, metaCount) => {
+  const numbers = verseIds
+    .map((id) => Number(id?.split?.(',')?.[2]))
+    .filter((n) => Number.isFinite(n));
+  const observedMax = numbers.length ? Math.max(...numbers) : 0;
+  const observedCount = numbers.length > 0 ? observedMax : 0;
+
+  const candidates = [existingCount, metaCount, observedCount]
+    .map((n) => (Number.isFinite(n) && n > 0 ? n : null))
+    .filter((n) => n !== null);
+
+  if (candidates.length === 0) return null;
+  return Math.max(...candidates);
+};
+
+/**
+ * Builds a list of verse numbers for display
+ * @param {string[]} verseIds - Array of verseIds (book,chapter,verse)
+ * @param {number|null|undefined} existingCount - Existing stored count
+ * @param {number|null|undefined} metaCount - Count from meta data
+ * @returns {number[]} Array of verse numbers (1-based)
+ */
+export const buildVerseNumbers = (verseIds = [], existingCount, metaCount) => {
+  const count = computeVerseCount(verseIds, existingCount, metaCount);
+  if (Number.isFinite(count) && count > 0) {
+    return Array.from({ length: count }, (_, idx) => idx + 1);
+  }
+
+  // Fall back to numbers derived from verseIds
+  return verseIds
+    .map((id) => Number(id?.split?.(',')?.[2]))
+    .filter((n) => Number.isFinite(n));
+};
+
+/**
+ * Creates a download plan for verse mode based on active chapters and verse selections
+ * @param {string[]} activeChapters
+ * @param {Object} verseSelections
+ * @returns {{chapterDownloads: string[], verseDownloads: string[]}}
+ */
+export const buildVerseDownloadPlan = (activeChapters = [], verseSelections = {}) => {
+  const chapterDownloads = [];
+  const verseDownloads = [];
+
+  activeChapters.forEach((chapterKey) => {
+    const selection = verseSelections[chapterKey];
+    if (selection?.allSelected) {
+      chapterDownloads.push(chapterKey);
+      return;
+    }
+
+    if (hasVerseSelection(selection)) {
+      (selection.selectedVerses || []).forEach((verseNumber) => {
+        verseDownloads.push(`${chapterKey},${verseNumber}`);
+      });
+    }
+  });
+
+  return { chapterDownloads, verseDownloads };
+};
+
+/**
+ * Determines if the required verses for a selection are already downloaded
+ * @param {Object|null} selection - verse selection for a chapter
+ * @param {string[]} verseIds - downloaded verse ids for the chapter
+ * @param {string} status - chapter status
+ * @param {number|null|undefined} verseCount - known verse count (optional)
+ * @returns {boolean}
+ */
+export const isSelectionComplete = (selection, verseIds = [], status, verseCount) => {
+  const downloaded = new Set(
+    verseIds
+      .map((id) => Number(id?.split?.(',')?.[2]))
+      .filter((n) => Number.isFinite(n))
+  );
+
+  // Chapter mode or allSelected requires the full chapter to be ready
+  if (!selection || selection.allSelected === true || selection.all === true) {
+    if (status !== STATUS.READY) return false;
+    const hasAny = downloaded.size > 0;
+    if (!hasAny) return false;
+    if (Number.isFinite(verseCount)) {
+      return downloaded.size >= verseCount;
+    }
+    return true;
+  }
+
+  const selected = selection.selectedVerses || selection.verses || [];
+  if (!selected.length) return false;
+  return selected.every((verseNum) => downloaded.has(verseNum));
+};
+
+/**
+ * Determines whether a chapter download should be triggered for a given selection/state
+ * @param {Object|null} selection - verse selection for the chapter
+ * @param {Object|null} chapterEntry - chapter index entry containing status/verseIds
+ * @returns {boolean}
+ */
+export const shouldDownloadFullChapter = (selection, chapterEntry) => {
+  if (selection && selection.allSelected === false && selection.all !== true && (selection.selectedVerses || selection.verses)) {
+    // Explicit verse-only selection: do NOT download the whole chapter
+    return false;
+  }
+
+  const ready = chapterEntry?.status === STATUS.READY && Array.isArray(chapterEntry?.verseIds) && chapterEntry.verseIds.length > 0;
+  return !ready;
+};
+
+/**
+ * Computes the status for an individual verse based on downloads and chapter state
+ * @param {Object} params
+ * @param {string} params.verseId
+ * @param {string} params.chapterKey
+ * @param {Map<string, Promise>|Set<string>} params.downloadsInFlight
+ * @param {Object} params.verseBank
+ * @param {string} params.chapterStatus
+ * @returns {string} STATUS value
+ */
+export const computeVerseStatus = ({
+  verseId,
+  chapterKey,
+  downloadsInFlight,
+  verseBank,
+  chapterStatus,
+  verseErrors = {},
+}) => {
+  if (verseErrors && verseErrors[verseId]) return STATUS.ERROR;
+  const inFlight = Boolean(downloadsInFlight?.has?.(verseId) || downloadsInFlight?.has?.(chapterKey));
+  if (inFlight) return STATUS.DOWNLOADING;
+  if (verseBank && verseBank[verseId]) return STATUS.READY;
+  return chapterStatus || STATUS.NOT_DOWNLOADED;
+};
+
+/**
+ * Returns the chapterKey (bookId,chapter) for a verseId
+ * @param {string} verseId - Verse ID in the form bookId,chapter,verse
+ * @returns {string|null} chapterKey or null when invalid
+ */
+export const chapterKeyFromVerseId = (verseId) => {
+  if (!verseId) return null;
+  const [bookIdStr, chapterStr] = `${verseId}`.split(',');
+  const bookId = Number(bookIdStr);
+  const chapter = Number(chapterStr);
+  if (!Number.isFinite(bookId) || !Number.isFinite(chapter)) return null;
+  return `${bookId},${chapter}`;
+};
+
+/**
+ * Computes the chapter status transition for single-verse downloads
+ * @param {string|undefined} currentStatus - Current status for the chapter
+ * @param {'start'|'success'|'error'} phase - Download phase
+ * @returns {string} Next status
+ */
+export const nextChapterStatusForVerseDownload = (currentStatus, phase) => {
+  if (phase === 'start') return STATUS.DOWNLOADING;
+  if (phase === 'error') return STATUS.ERROR;
+  if (phase === 'success') {
+    return currentStatus === STATUS.READY ? STATUS.READY : STATUS.PARTIAL;
+  }
+  return currentStatus || STATUS.NOT_DOWNLOADED;
 };
 
 /**
@@ -225,10 +411,54 @@ export const validateBlankConfig = (minBlanks, maxBlanks, maxBlankPercentage, ma
     errors.push(`Maximum blanks exceeds allowed limit of ${maxAllowedBlanks}`);
   }
 
-  return {
+ return {
     valid: errors.length === 0,
     errors
   };
+};
+
+const toNumberOrNull = (value) => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+};
+
+const isNonNumericString = (value) => typeof value === 'string' && !/^\d+$/.test(value);
+
+const normalizeVerseEntry = (entry, defaults = {}) => {
+  if (!entry) return null;
+
+  const ref = entry.reference || {};
+  const bookId = toNumberOrNull(entry.bookId ?? entry.book_id ?? ref.book_id ?? defaults.bookId);
+  const chapter = toNumberOrNull(entry.chapter ?? entry.chapter_nr ?? ref.chapter ?? defaults.chapter);
+  const verse = toNumberOrNull(
+    entry.verse_nr ?? entry.nr ?? ref.verse_nr ?? ref.nr ?? entry.verse ?? ref.verse ?? entry.verse_nr_alt
+  );
+
+  let text =
+    entry.content ??
+    entry.text ??
+    entry.text_nr ??
+    entry.text_clean ??
+    entry.verseText ??
+    entry.verse_content ??
+    (isNonNumericString(entry.verse) ? entry.verse : '');
+
+  text = text ?? '';
+
+  if (!Number.isFinite(verse)) return null;
+
+  const result = {
+    bookId,
+    chapter,
+    verse,
+    text,
+  };
+
+  if (Number.isFinite(bookId) && Number.isFinite(chapter)) {
+    result.verseId = `${bookId},${chapter},${verse}`;
+  }
+
+  return result;
 };
 
 /**
@@ -237,18 +467,39 @@ export const validateBlankConfig = (minBlanks, maxBlanks, maxBlankPercentage, ma
  * @returns {Array} Parsed verses
  */
 export const parseVerses = (data) => {
-  if (!Array.isArray(data)) return [];
+  if (!data) return [];
 
-  return data.map(item => {
-    if (!item || !item.reference) return null;
+  const defaults = {
+    bookId: toNumberOrNull(data.book_id ?? data.bookId),
+    chapter: toNumberOrNull(data.chapter ?? data.chapter_nr),
+  };
 
-    const ref = item.reference;
-    return {
-      bookId: ref.book_id,
-      chapter: ref.chapter,
-      verse: ref.verse,
-      text: item.content || '',
-      verseId: `${ref.book_id},${ref.chapter},${ref.verse}`
-    };
-  }).filter(Boolean);
+  const normalizeWithDefaults = (entry) => normalizeVerseEntry(entry, defaults);
+
+  if (Array.isArray(data)) {
+    return data.map(normalizeWithDefaults).filter(Boolean);
+  }
+
+  if (Array.isArray(data.verses)) {
+    return data.verses.map(normalizeWithDefaults).filter(Boolean);
+  }
+
+  if (data.verses && typeof data.verses === 'object') {
+    return Object.entries(data.verses)
+      .map(([verseNum, value]) => {
+        if (typeof value === 'string') {
+          return { verse: verseNum, text: value };
+        }
+        return { verse: verseNum, ...value };
+      })
+      .map(normalizeWithDefaults)
+      .filter(Boolean);
+  }
+
+  if (typeof data === 'object') {
+    const single = normalizeWithDefaults(data);
+    return single ? [single] : [];
+  }
+
+  return [];
 };
