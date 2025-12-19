@@ -1117,8 +1117,34 @@ const computeMaxWordsInActiveSelection = () => {
 };
 
 const updateBlankInputs = () => {
-  const maxWords = computeMaxWordsInActiveSelection();
   const percentVal = Math.max(1, Math.min(toInt(appState.maxBlankPercentage, 100), 100));
+  const hasSelection = appState.activeVerseIds.length > 0;
+
+  if (!hasSelection) {
+    const maxVal = Math.max(1, toInt(appState.maxBlanks, 1));
+    const minVal = Math.max(1, Math.min(toInt(appState.minBlanks, 1), maxVal));
+
+    appState.minBlanks = minVal;
+    appState.maxBlanks = maxVal;
+    appState.maxBlankPercentage = percentVal;
+
+    minBlanksInput.min = 1;
+    minBlanksInput.removeAttribute('max');
+    maxBlanksInput.min = 1;
+    maxBlanksInput.removeAttribute('max');
+    maxBlankPercentageInput.min = 1;
+    maxBlankPercentageInput.max = 100;
+
+    minBlanksInput.value = appState.minBlanks;
+    maxBlanksInput.value = appState.maxBlanks;
+    maxBlankPercentageInput.value = appState.maxBlankPercentage;
+
+    blankLimitHint.textContent = 'Select at least one verse or chapter to compute blank limits.';
+    saveState();
+    return;
+  }
+
+  const maxWords = computeMaxWordsInActiveSelection();
   const percentCap = Math.max(1, Math.floor((percentVal / 100) * maxWords));
   const allowedMax = Math.min(maxWords, percentCap);
 
@@ -3243,12 +3269,17 @@ const handleMinBlanksChange = (evt) => {
   if (minBlanksInput.value === '') return; // allow clearing before entering a new number
   const value = Math.max(1, toInt(minBlanksInput.value, 1));
   appState.minBlanks = value;
-  const maxWords = computeMaxWordsInActiveSelection();
-  const percentVal = Math.max(1, Math.min(toInt(appState.maxBlankPercentage, 100), 100));
-  const percentCap = Math.max(1, Math.floor((percentVal / 100) * maxWords));
-  const allowedMax = Math.min(maxWords, percentCap);
-  if (appState.maxBlanks < value) {
-    appState.maxBlanks = Math.min(value, allowedMax);
+  const hasSelection = appState.activeVerseIds.length > 0;
+  if (hasSelection) {
+    const maxWords = computeMaxWordsInActiveSelection();
+    const percentVal = Math.max(1, Math.min(toInt(appState.maxBlankPercentage, 100), 100));
+    const percentCap = Math.max(1, Math.floor((percentVal / 100) * maxWords));
+    const allowedMax = Math.min(maxWords, percentCap);
+    if (appState.maxBlanks < value) {
+      appState.maxBlanks = Math.min(value, allowedMax);
+    }
+  } else if (appState.maxBlanks < value) {
+    appState.maxBlanks = value;
   }
   // Only update UI if this is not an 'input' event (i.e., user is still typing)
   if (evt.type !== 'input') {
@@ -3259,11 +3290,19 @@ const handleMinBlanksChange = (evt) => {
 const handleMaxBlanksChange = (evt) => {
   if (maxBlanksInput.value === '') return; // allow clearing before entering a new number
   const value = Math.max(1, toInt(maxBlanksInput.value, 1));
-  const maxWords = computeMaxWordsInActiveSelection();
-  const percentVal = Math.max(1, Math.min(toInt(appState.maxBlankPercentage, 100), 100));
-  const percentCap = Math.max(1, Math.floor((percentVal / 100) * maxWords));
-  const allowedMax = Math.min(maxWords, percentCap);
-  appState.maxBlanks = Math.min(value, allowedMax);
+  const hasSelection = appState.activeVerseIds.length > 0;
+  if (hasSelection) {
+    const maxWords = computeMaxWordsInActiveSelection();
+    const percentVal = Math.max(1, Math.min(toInt(appState.maxBlankPercentage, 100), 100));
+    const percentCap = Math.max(1, Math.floor((percentVal / 100) * maxWords));
+    const allowedMax = Math.min(maxWords, percentCap);
+    appState.maxBlanks = Math.min(value, allowedMax);
+  } else {
+    appState.maxBlanks = value;
+  }
+  if (appState.maxBlanks < appState.minBlanks) {
+    appState.minBlanks = appState.maxBlanks;
+  }
   // Only update UI if this is not an 'input' event (i.e., user is still typing)
   if (evt.type !== 'input') {
     updateBlankInputs();
@@ -3293,36 +3332,52 @@ const handleMaxPercentChange = (evt) => {
   });
 });
 
+if (typeof window !== 'undefined' && window.__PBE_EXPOSE_TEST_API__) {
+  window.__pbeTestApi = {
+    get appState() {
+      return appState;
+    },
+    updateBlankInputs,
+    recomputeActiveVerseIds,
+    handleMinBlanksChange,
+    handleMaxBlanksChange,
+  };
+}
+
+const shouldAutoInit = typeof window === 'undefined' || !window.__PBE_SKIP_INIT__;
+
 // Initialize app with async state loading
-(async () => {
-  await loadBooksData();
-  await loadChaptersByYear();
-  const initialState = await loadState();
-  if (initialState) {
-    appState = initialState;
-    // Save the migrated state back to IndexedDB
-    await saveState();
-  }
+if (shouldAutoInit) {
+  (async () => {
+    await loadBooksData();
+    await loadChaptersByYear();
+    const initialState = await loadState();
+    if (initialState) {
+      appState = initialState;
+      // Save the migrated state back to IndexedDB
+      await saveState();
+    }
 
-  // Apply default year for new users if no year is selected
-  if (!appState.year) {
-  const yearKeys = Object.keys(chaptersByYear);
-  const currentKey = computeCurrentYearKey(yearKeys);
-  appState.year = currentKey || yearKeys[0] || '';
-  }
+    // Apply default year for new users if no year is selected
+    if (!appState.year) {
+      const yearKeys = Object.keys(chaptersByYear);
+      const currentKey = computeCurrentYearKey(yearKeys);
+      appState.year = currentKey || yearKeys[0] || '';
+    }
 
-  if (appState.year) {
-    applyYearExclusions(appState.year);
-  }
-  await seedCommentaryContent();
+    if (appState.year) {
+      applyYearExclusions(appState.year);
+    }
+    await seedCommentaryContent();
 
-  activeSelector = appState.activeSelector === 'verse' ? 'verse' : 'chapter';
-  renderYearOptions(appState.year);
-  if (appState.year) {
-    seasonSelect.value = appState.year;
-  }
+    activeSelector = appState.activeSelector === 'verse' ? 'verse' : 'chapter';
+    renderYearOptions(appState.year);
+    if (appState.year) {
+      seasonSelect.value = appState.year;
+    }
 
-  installCompromisePlugin();
-  toggleChapterSelector();
-  requestPersistentStorage();
-})();
+    installCompromisePlugin();
+    toggleChapterSelector();
+    requestPersistentStorage();
+  })();
+}
