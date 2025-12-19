@@ -1626,7 +1626,7 @@ const renderVerseOptions = (year, selectedValues = new Set()) => {
       chapterCheckbox.checked = allSelected || (verseNumbers.length > 0 && verseNumbers.every((v) => selectedVerses.has(v)));
       const numberSpan = document.createElement('span');
       numberSpan.className = 'chapter-number';
-      numberSpan.textContent = chapter === 0 ? 'Intro' : `Chapter ${chapter}`;
+      numberSpan.textContent = chapter === 0 ? 'Intro (ABC)' : `Chapter ${chapter}`;
       const statusSpan = document.createElement('span');
       statusSpan.className = `chapter-status${status ? ` ${status}` : ''}`;
       statusSpan.textContent = statusLabelFor(status);
