@@ -296,6 +296,18 @@
       "end": 18
     }
   ],
+  "2024-2025": [
+    {
+      "bookKey": "romans",
+      "start": 1,
+      "end": 16
+    },
+    {
+      "bookKey": "1corinthians",
+      "start": 1,
+      "end": 16
+    }
+  ],
   "2025-2026": [
     {
       "bookKey": "isaiah",
