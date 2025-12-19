@@ -28,6 +28,8 @@ import {
   allowedVersesFromInclusions,
   formatYearSelectionDescription,
   computeCurrentYearKey,
+  chaptersToRender,
+  commentaryLabelForIndex,
 } from '../src/utils.js';
 
 describe('stripHtml', () => {
@@ -691,6 +693,36 @@ describe('verse download helpers', () => {
     it('should return null when no match', () => {
       const now = new Date('2030-01-01T00:00:00Z');
       expect(computeCurrentYearKey(yearKeys, now)).toBeNull();
+    });
+  });
+
+  describe('chaptersToRender', () => {
+    it('should include intro chapter when commentary exists', () => {
+      const meta = { commentary: [{}], totalChapters: 2 };
+      expect(chaptersToRender(meta, 1, 2)).toEqual([0, 1, 2]);
+    });
+
+    it('should omit intro when no commentary', () => {
+      const meta = { totalChapters: 2 };
+      expect(chaptersToRender(meta, 1, 2)).toEqual([1, 2]);
+    });
+  });
+
+  describe('commentaryLabelForIndex', () => {
+    it('should return labels with part numbers when multiple parts', () => {
+      const commentary = [
+        { title: 'Title', parts: ['a'] },
+        { title: 'Backgrounds', parts: ['b1', 'b2'] },
+      ];
+      expect(commentaryLabelForIndex(commentary, 1)).toBe('Title');
+      expect(commentaryLabelForIndex(commentary, 2)).toBe('Backgrounds (Part 1/2)');
+      expect(commentaryLabelForIndex(commentary, 3)).toBe('Backgrounds (Part 2/2)');
+      expect(commentaryLabelForIndex(commentary, 4)).toBeNull();
+    });
+
+    it('should handle invalid input gracefully', () => {
+      expect(commentaryLabelForIndex(null, 1)).toBeNull();
+      expect(commentaryLabelForIndex([], 0)).toBeNull();
     });
   });
 });

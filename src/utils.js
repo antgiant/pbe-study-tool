@@ -458,6 +458,49 @@ export const allowedVersesFromInclusions = (totalVerses, includeRanges = []) => 
   return Array.from(allowed).sort((a, b) => a - b);
 };
 
+/**
+ * Returns the list of chapters to render, including intro (chapter 0) when commentary exists.
+ * @param {Object} meta - book metadata with commentary array and totalChapters
+ * @param {number} start - start chapter
+ * @param {number} end - end chapter
+ * @returns {number[]} chapters including 0 for intro when applicable
+ */
+export const chaptersToRender = (meta, start, end) => {
+  const chapters = [];
+  if (meta?.commentary?.length && start <= 1) {
+    chapters.push(0);
+  }
+  for (let c = start; c <= end; c += 1) {
+    chapters.push(c);
+  }
+  return chapters;
+};
+
+/**
+ * Returns a human-friendly label for a commentary part index (1-based).
+ * Example: Title with multiple parts returns "Title (Part 2/3)".
+ * @param {Array<{title: string, parts: string[]}>} commentary
+ * @param {number} partIndex
+ * @returns {string|null}
+ */
+export const commentaryLabelForIndex = (commentary = [], partIndex) => {
+  if (!Number.isFinite(partIndex) || partIndex < 1) return null;
+  let idx = 0;
+  for (const section of commentary || []) {
+    const parts = Array.isArray(section?.parts) ? section.parts : [];
+    for (let i = 0; i < parts.length; i += 1) {
+      idx += 1;
+      if (idx === partIndex) {
+        const title = section?.title || 'Intro';
+        // Only show part number if there is more than one part
+        if (parts.length > 1) return `${title} (Part ${i + 1}/${parts.length})`;
+        return title;
+      }
+    }
+  }
+  return null;
+};
+
 const parseYearKey = (yearKey) => {
   const match = /^(\d{4})-(\d{4})$/.exec(yearKey);
   if (!match) return null;

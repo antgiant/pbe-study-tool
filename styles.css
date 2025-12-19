@@ -159,6 +159,10 @@ button:disabled {
   margin-top: 6px;
 }
 
+.verse-check.commentary-entry {
+  grid-column: span 2;
+}
+
 .verse-placeholder {
   padding: 6px 8px;
   border: 1px dashed rgba(255, 255, 255, 0.2);

@@ -588,553 +588,43 @@ const buildPersistableState = (includeVerses = true) => {
   };
 };
 
-const books = {
-  genesis: {
-    id: 1,
-    totalChapters: 50,
-    label: 'Genesis',
-    verseCounts: [
-      31, 25, 24, 26, 32, 22, 24, 22, 29, 32, 32, 20, 18, 24, 21, 16, 27, 33, 38, 18, 34, 24, 20,
-      67, 34, 35, 46, 22, 35, 43, 55, 32, 20, 31, 29, 43, 36, 30, 23, 23, 57, 38, 34, 34, 28, 34,
-      31, 22, 33, 26,
-    ],
-  },
-  exodus: {
-    id: 2,
-    totalChapters: 40,
-    label: 'Exodus',
-    verseCounts: [
-      22, 25, 22, 31, 23, 30, 25, 32, 35, 29, 10, 51, 22, 31, 27, 36, 16, 27, 25, 26, 36, 31, 33,
-      18, 40, 37, 21, 43, 46, 38, 18, 35, 23, 35, 35, 38, 29, 31, 43, 38,
-    ],
-  },
-  leviticus: {
-    id: 3,
-    totalChapters: 27,
-    label: 'Leviticus',
-    verseCounts: [
-      17, 16, 17, 35, 19, 30, 38, 36, 24, 20, 47, 8, 59, 57, 33, 34, 16, 30, 37, 27, 24, 33, 44, 23,
-      55, 46, 34,
-    ],
-  },
-  numbers: {
-    id: 4,
-    totalChapters: 36,
-    label: 'Numbers',
-    verseCounts: [
-      54, 34, 51, 49, 31, 27, 89, 26, 23, 36, 35, 16, 33, 45, 41, 50, 13, 32, 22, 29, 35, 41, 30,
-      25, 18, 65, 23, 31, 40, 16, 54, 42, 56, 29, 34, 13,
-    ],
-  },
-  deuteronomy: {
-    id: 5,
-    totalChapters: 34,
-    label: 'Deuteronomy',
-    verseCounts: [
-      46, 37, 29, 49, 33, 25, 26, 20, 29, 22, 32, 32, 18, 29, 23, 22, 20, 22, 21, 20, 23, 30, 25,
-      22, 19, 19, 26, 68, 29, 20, 30, 52, 29, 12,
-    ],
-  },
-  joshua: {
-    id: 6,
-    totalChapters: 24,
-    label: 'Joshua',
-    verseCounts: [
-      18, 24, 17, 24, 15, 27, 26, 35, 27, 43, 23, 24, 33, 15, 63, 10, 18, 28, 51, 9, 45, 34, 16,
-      33,
-    ],
-  },
-  judges: {
-    id: 7,
-    totalChapters: 21,
-    label: 'Judges',
-    verseCounts: [
-      36, 23, 31, 24, 31, 40, 25, 35, 57, 18, 40, 15, 25, 20, 20, 31, 13, 31, 30, 48, 25,
-    ],
-  },
-  ruth: {
-    id: 8,
-    totalChapters: 4,
-    label: 'Ruth',
-    verseCounts: [22, 23, 18, 22],
-  },
-  '1samuel': {
-    id: 9,
-    totalChapters: 31,
-    label: '1 Samuel',
-    verseCounts: [
-      28, 36, 21, 22, 12, 21, 17, 22, 27, 27, 15, 25, 23, 52, 35, 23, 58, 30, 24, 43, 15, 23, 29,
-      22, 44, 25, 12, 25, 11, 31, 13,
-    ],
-  },
-  '2samuel': {
-    id: 10,
-    totalChapters: 24,
-    label: '2 Samuel',
-    verseCounts: [
-      27, 32, 39, 12, 25, 23, 29, 18, 13, 19, 27, 31, 39, 33, 37, 23, 29, 33, 43, 26, 22, 51, 39,
-      25,
-    ],
-  },
-  '1kings': {
-    id: 11,
-    totalChapters: 22,
-    label: '1 Kings',
-    verseCounts: [
-      53, 46, 28, 34, 18, 38, 51, 66, 28, 29, 43, 33, 34, 31, 34, 34, 24, 46, 21, 43, 29, 54,
-    ],
-  },
-  '2kings': {
-    id: 12,
-    totalChapters: 25,
-    label: '2 Kings',
-    verseCounts: [
-      18, 25, 27, 44, 27, 33, 20, 29, 37, 36, 21, 21, 25, 29, 38, 20, 41, 37, 37, 21, 26, 20, 37,
-      20, 30,
-    ],
-  },
-  '1chronicles': {
-    id: 13,
-    totalChapters: 29,
-    label: '1 Chronicles',
-    verseCounts: [
-      54, 55, 24, 43, 26, 81, 40, 40, 44, 14, 47, 40, 14, 17, 29, 43, 27, 17, 19, 8, 30, 19, 32,
-      31, 31, 32, 34, 21, 30,
-    ],
-  },
-  '2chronicles': {
-    id: 14,
-    totalChapters: 36,
-    label: '2 Chronicles',
-    verseCounts: [
-      17, 18, 17, 22, 14, 42, 22, 18, 31, 19, 23, 16, 22, 15, 19, 14, 19, 34, 11, 37, 20, 12, 21,
-      27, 28, 23, 9, 27, 36, 27, 21, 33, 25, 33, 27, 23,
-    ],
-  },
-  ezra: {
-    id: 15,
-    totalChapters: 10,
-    label: 'Ezra',
-    verseCounts: [11, 70, 13, 24, 17, 22, 28, 36, 15, 44],
-  },
-  nehemiah: {
-    id: 16,
-    totalChapters: 13,
-    label: 'Nehemiah',
-    verseCounts: [11, 20, 32, 23, 19, 19, 73, 18, 38, 39, 36, 47, 31],
-  },
-  esther: {
-    id: 17,
-    totalChapters: 10,
-    label: 'Esther',
-    verseCounts: [22, 23, 15, 17, 14, 14, 10, 17, 32, 3],
-  },
-  job: {
-    id: 18,
-    totalChapters: 42,
-    label: 'Job',
-    verseCounts: [
-      22, 13, 26, 21, 27, 30, 21, 22, 35, 22, 20, 25, 28, 22, 35, 22, 16, 21, 29, 29, 34, 30, 17,
-      25, 6, 14, 23, 28, 25, 31, 40, 22, 33, 37, 16, 33, 24, 41, 30, 24, 34, 17,
-    ],
-  },
-  psalms: {
-    id: 19,
-    totalChapters: 150,
-    label: 'Psalms',
-    verseCounts: [
-      6, 12, 8, 8, 12, 10, 17, 9, 20, 18, 7, 8, 6, 7, 5, 11, 15, 50, 14, 9, 13, 31, 6, 10, 22, 12,
-      14, 9, 11, 12, 24, 11, 22, 22, 28, 12, 40, 22, 13, 17, 13, 11, 5, 26, 17, 11, 9, 14, 20, 23,
-      19, 9, 6, 7, 23, 13, 11, 11, 17, 12, 8, 12, 11, 10, 13, 20, 7, 35, 36, 5, 24, 20, 28, 23, 10,
-      12, 20, 72, 13, 19, 16, 8, 18, 12, 13, 17, 7, 18, 52, 17, 16, 15, 5, 23, 11, 13, 12, 9, 9, 5,
-      8, 28, 22, 35, 45, 48, 43, 13, 31, 7, 10, 10, 9, 8, 18, 19, 2, 29, 176, 7, 8, 9, 4, 8, 5, 6,
-      5, 6, 8, 8, 3, 18, 3, 3, 21, 26, 9, 8, 24, 13, 10, 7, 12, 15, 21, 10, 20, 14, 9, 6,
-    ],
-  },
-  proverbs: {
-    id: 20,
-    totalChapters: 31,
-    label: 'Proverbs',
-    verseCounts: [
-      33, 22, 35, 27, 23, 35, 27, 36, 18, 32, 31, 28, 25, 35, 33, 33, 28, 24, 29, 30, 31, 29, 35,
-      34, 28, 28, 27, 28, 27, 33, 31,
-    ],
-  },
-  ecclesiastes: {
-    id: 21,
-    totalChapters: 12,
-    label: 'Ecclesiastes',
-    verseCounts: [18, 26, 22, 16, 20, 12, 29, 17, 18, 20, 10, 14],
-  },
-  songofsolomon: {
-    id: 22,
-    totalChapters: 8,
-    label: 'Song of Solomon',
-    verseCounts: [17, 17, 11, 16, 16, 13, 13, 14],
-  },
-  isaiah: {
-    id: 23,
-    totalChapters: 66,
-    label: 'Isaiah',
-    verseCounts: [
-      31, 22, 26, 6, 30, 13, 25, 22, 21, 34, 16, 6, 22, 32, 9, 14, 14, 7, 25, 6, 17, 25, 18, 23,
-      12, 21, 13, 29, 24, 33, 9, 20, 24, 17, 10, 22, 38, 22, 8, 31, 29, 25, 28, 28, 25, 13, 15, 22,
-      26, 11, 23, 15, 12, 17, 13, 12, 21, 22, 22, 11, 12, 19, 12, 25, 24,
-    ],
-  },
-  jeremiah: {
-    id: 24,
-    totalChapters: 52,
-    label: 'Jeremiah',
-    verseCounts: [
-      19, 37, 25, 31, 31, 30, 34, 22, 26, 25, 23, 17, 27, 22, 21, 21, 27, 23, 15, 18, 14, 30, 40,
-      10, 38, 24, 22, 17, 32, 24, 40, 44, 26, 22, 19, 32, 21, 28, 18, 16, 18, 22, 13, 30, 5, 28, 7,
-      47, 39, 46, 64, 34,
-    ],
-  },
-  lamentations: {
-    id: 25,
-    totalChapters: 5,
-    label: 'Lamentations',
-    verseCounts: [22, 22, 66, 22, 22],
-  },
-  ezekiel: {
-    id: 26,
-    totalChapters: 48,
-    label: 'Ezekiel',
-    verseCounts: [
-      28, 10, 27, 17, 17, 14, 27, 18, 11, 22, 25, 28, 23, 23, 8, 63, 24, 32, 14, 49, 32, 31, 49,
-      27, 17, 21, 36, 26, 21, 26, 18, 32, 33, 31, 15, 38, 28, 23, 29, 49, 26, 20, 27, 31, 25, 24,
-      23, 35,
-    ],
-  },
-  daniel: {
-    id: 27,
-    totalChapters: 12,
-    label: 'Daniel',
-    verseCounts: [21, 49, 30, 37, 31, 28, 28, 27, 27, 21, 45, 13],
-  },
-  hosea: {
-    id: 28,
-    totalChapters: 14,
-    label: 'Hosea',
-    verseCounts: [11, 23, 5, 19, 15, 11, 16, 14, 17, 15, 12, 14, 16, 9],
-  },
-  joel: {
-    id: 29,
-    totalChapters: 3,
-    label: 'Joel',
-    verseCounts: [20, 32, 21],
-  },
-  amos: {
-    id: 30,
-    totalChapters: 9,
-    label: 'Amos',
-    verseCounts: [15, 16, 15, 13, 27, 14, 17, 14, 15],
-  },
-  obadiah: {
-    id: 31,
-    totalChapters: 1,
-    label: 'Obadiah',
-    verseCounts: [21],
-  },
-  jonah: {
-    id: 32,
-    totalChapters: 4,
-    label: 'Jonah',
-    verseCounts: [17, 10, 10, 11],
-  },
-  micah: {
-    id: 33,
-    totalChapters: 7,
-    label: 'Micah',
-    verseCounts: [16, 13, 12, 13, 15, 16, 20],
-  },
-  nahum: {
-    id: 34,
-    totalChapters: 3,
-    label: 'Nahum',
-    verseCounts: [15, 13, 19],
-  },
-  habakkuk: {
-    id: 35,
-    totalChapters: 3,
-    label: 'Habakkuk',
-    verseCounts: [17, 20, 19],
-  },
-  zephaniah: {
-    id: 36,
-    totalChapters: 3,
-    label: 'Zephaniah',
-    verseCounts: [18, 15, 20],
-  },
-  haggai: {
-    id: 37,
-    totalChapters: 2,
-    label: 'Haggai',
-    verseCounts: [15, 23],
-  },
-  zechariah: {
-    id: 38,
-    totalChapters: 14,
-    label: 'Zechariah',
-    verseCounts: [21, 13, 10, 14, 11, 15, 14, 23, 17, 12, 17, 14, 9, 21],
-  },
-  malachi: {
-    id: 39,
-    totalChapters: 4,
-    label: 'Malachi',
-    verseCounts: [14, 17, 18, 6],
-  },
-  matthew: {
-    id: 40,
-    totalChapters: 28,
-    label: 'Matthew',
-    verseCounts: [
-      25, 22, 17, 25, 48, 34, 29, 34, 38, 42, 30, 50, 58, 36, 39, 28, 27, 35, 30, 34, 46, 45, 39,
-      51, 46, 74, 66, 20,
-    ],
-  },
-  mark: {
-    id: 41,
-    totalChapters: 16,
-    label: 'Mark',
-    verseCounts: [45, 28, 35, 40, 43, 56, 36, 37, 50, 52, 33, 44, 37, 72, 47, 20],
-  },
-  luke: {
-    id: 42,
-    totalChapters: 24,
-    label: 'Luke',
-    verseCounts: [
-      80, 52, 38, 44, 39, 49, 50, 56, 62, 42, 54, 59, 35, 35, 32, 31, 37, 43, 48, 47, 38, 71, 56,
-      53,
-    ],
-  },
-  john: {
-    id: 43,
-    totalChapters: 21,
-    label: 'John',
-    verseCounts: [51, 25, 36, 54, 47, 71, 53, 59, 41, 42, 57, 50, 38, 31, 27, 33, 26, 40, 42, 31, 25],
-  },
-  acts: {
-    id: 44,
-    totalChapters: 28,
-    label: 'Acts',
-    verseCounts: [
-      26, 47, 26, 37, 42, 15, 60, 40, 43, 48, 30, 25, 52, 28, 41, 40, 34, 28, 41, 38, 40, 30, 35,
-      27, 27, 32, 44, 31,
-    ],
-  },
-  romans: {
-    id: 45,
-    totalChapters: 16,
-    label: 'Romans',
-    verseCounts: [32, 29, 31, 25, 21, 23, 25, 39, 33, 21, 36, 21, 14, 23, 33, 27],
-  },
-  '1corinthians': {
-    id: 46,
-    totalChapters: 16,
-    label: '1 Corinthians',
-    verseCounts: [31, 16, 23, 21, 13, 20, 40, 13, 27, 33, 34, 31, 13, 40, 58, 24],
-  },
-  '2corinthians': {
-    id: 47,
-    totalChapters: 13,
-    label: '2 Corinthians',
-    verseCounts: [24, 17, 18, 18, 21, 18, 16, 24, 15, 18, 33, 21, 14],
-  },
-  galatians: {
-    id: 48,
-    totalChapters: 6,
-    label: 'Galatians',
-    verseCounts: [24, 21, 29, 31, 26, 18],
-  },
-  ephesians: {
-    id: 49,
-    totalChapters: 6,
-    label: 'Ephesians',
-    verseCounts: [23, 22, 21, 32, 33, 24],
-  },
-  philippians: {
-    id: 50,
-    totalChapters: 4,
-    label: 'Philippians',
-    verseCounts: [30, 30, 21, 23],
-  },
-  colossians: {
-    id: 51,
-    totalChapters: 4,
-    label: 'Colossians',
-    verseCounts: [29, 23, 25, 18],
-  },
-  '1thessalonians': {
-    id: 52,
-    totalChapters: 5,
-    label: '1 Thessalonians',
-    verseCounts: [10, 20, 13, 18, 28],
-  },
-  '2thessalonians': {
-    id: 53,
-    totalChapters: 3,
-    label: '2 Thessalonians',
-    verseCounts: [12, 17, 18],
-  },
-  '1timothy': {
-    id: 54,
-    totalChapters: 6,
-    label: '1 Timothy',
-    verseCounts: [20, 15, 16, 16, 25, 21],
-  },
-  '2timothy': {
-    id: 55,
-    totalChapters: 4,
-    label: '2 Timothy',
-    verseCounts: [18, 26, 17, 22],
-  },
-  titus: {
-    id: 56,
-    totalChapters: 3,
-    label: 'Titus',
-    verseCounts: [16, 15, 15],
-  },
-  philemon: {
-    id: 57,
-    totalChapters: 1,
-    label: 'Philemon',
-    verseCounts: [25],
-  },
-  hebrews: {
-    id: 58,
-    totalChapters: 13,
-    label: 'Hebrews',
-    verseCounts: [14, 18, 19, 16, 14, 20, 28, 13, 28, 39, 40, 29, 25],
-  },
-  james: {
-    id: 59,
-    totalChapters: 5,
-    label: 'James',
-    verseCounts: [27, 26, 18, 17, 20],
-  },
-  '1peter': {
-    id: 60,
-    totalChapters: 5,
-    label: '1 Peter',
-    verseCounts: [25, 25, 22, 19, 14],
-  },
-  '2peter': {
-    id: 61,
-    totalChapters: 3,
-    label: '2 Peter',
-    verseCounts: [21, 22, 18],
-  },
-  '1john': {
-    id: 62,
-    totalChapters: 5,
-    label: '1 John',
-    verseCounts: [10, 29, 24, 21, 21],
-  },
-  '2john': {
-    id: 63,
-    totalChapters: 1,
-    label: '2 John',
-    verseCounts: [13],
-  },
-  '3john': {
-    id: 64,
-    totalChapters: 1,
-    label: '3 John',
-    verseCounts: [15],
-  },
-  jude: {
-    id: 65,
-    totalChapters: 1,
-    label: 'Jude',
-    verseCounts: [25],
-  },
-  revelation: {
-    id: 66,
-    totalChapters: 22,
-    label: 'Revelation',
-    verseCounts: [
-      20, 29, 22, 11, 14, 17, 17, 13, 21, 11, 19, 18, 18, 20, 8, 21, 18, 24, 21, 15, 27, 21,
-    ],
-  },
+let books = {};
+
+const loadBooksData = async () => {
+  if (Object.keys(books).length) return books;
+  try {
+    const response = await fetch('books.json');
+    if (!response.ok && response.status !== 0) {
+      throw new Error(`Failed to load books.json: ${response.status}`);
+    }
+    const text = await response.text();
+    books = JSON.parse(text);
+  } catch (err) {
+    console.error('Unable to load books.json', err);
+    throw err;
+  }
+  return books;
 };
 
-const chaptersByYear = {
-  defaultYear: '2025-2026', // Default selection for new users
-  '2011-2012': [
-    { bookKey: '1samuel', start: 1, end: 31 },
-    { bookKey: 'mark', start: 1, end: 16 },
-  ],
-  '2012-2013': [
-    { bookKey: 'acts', start: 1, end: 28 },
-    { bookKey: '1thessalonians', start: 1, end: 5 },
-    { bookKey: '2thessalonians', start: 1, end: 3 },
-  ],
-  '2013-2014': [{ bookKey: '2samuel', start: 1, end: 24 }],
-  '2014-2015': [{ bookKey: 'matthew', start: 1, end: 28 }],
-  '2015-2016': [{ bookKey: 'exodus', start: 1, end: 40 }],
-  '2016-2017': [
-    { bookKey: 'galatians', start: 1, end: 6 },
-    { bookKey: 'ephesians', start: 1, end: 6 },
-    { bookKey: 'philippians', start: 1, end: 4 },
-    { bookKey: 'colossians', start: 1, end: 4 },
-    { bookKey: '1timothy', start: 1, end: 6 },
-    { bookKey: '2timothy', start: 1, end: 4 },
-  ],
-  '2017-2018': [
-    { bookKey: 'daniel', start: 1, end: 12 },
-    { bookKey: 'esther', start: 1, end: 10 },
-  ],
-  '2018-2019': [{ bookKey: 'luke', start: 1, end: 24 }],
-  '2019-2020': [
-    { bookKey: 'ezra', start: 1, end: 1 },
-    { bookKey: 'ezra', start: 3, end: 7 },
-    { bookKey: 'ezra', start: 8, end: 8, include: [[15, 36]] }, // Ezra 8:15–36
-    { bookKey: 'ezra', start: 9, end: 9 },
-    { bookKey: 'ezra', start: 10, end: 10, include: [[1, 17]] }, // Ezra 10:1–17
-    { bookKey: 'nehemiah', start: 1, end: 6 },
-    { bookKey: 'nehemiah', start: 7, end: 7, include: [[1, 6], [64, 73]] }, // Nehemiah 7:1–6, 64–73
-    { bookKey: 'nehemiah', start: 8, end: 9 },
-    { bookKey: 'nehemiah', start: 10, end: 10, include: [[28, 39]] }, // Nehemiah 10:28–39
-    { bookKey: 'nehemiah', start: 11, end: 11, include: [[1, 2]] }, // Nehemiah 11:1–2
-    { bookKey: 'nehemiah', start: 12, end: 12, include: [[27, 47]] }, // Nehemiah 12:27–47
-    { bookKey: 'nehemiah', start: 13, end: 13 },
-    { bookKey: 'hosea', start: 1, end: 14 },
-    { bookKey: 'amos', start: 1, end: 9 },
-    { bookKey: 'jonah', start: 1, end: 4 },
-    { bookKey: 'micah', start: 1, end: 7 },
-  ],
-  '2020-2021': [
-    { bookKey: 'hebrews', start: 1, end: 13 },
-    { bookKey: 'james', start: 1, end: 5 },
-    { bookKey: '1peter', start: 1, end: 5 },
-    { bookKey: '2peter', start: 1, end: 3 },
-  ],
-  '2021-2022': [
-    { bookKey: 'ruth', start: 1, end: 4 },
-    { bookKey: '1kings', start: 1, end: 22 },
-  ],
-  '2022-2023': [{ bookKey: 'john', start: 1, end: 21 }],
-  '2023-2024': [
-    { bookKey: 'joshua', start: 1, end: 12 },
-    { bookKey: 'joshua', start: 14, end: 14 },
-    { bookKey: 'joshua', start: 15, end: 15, include: [[13, 19]] }, // Joshua 15:13–19
-    { bookKey: 'joshua', start: 20, end: 24 },
-    { bookKey: 'judges', start: 1, end: 18 },
-  ],
-  '2025-2026': [{ bookKey: 'isaiah', start: 1, end: 33 }],
-  '2026-2027': [
-    { bookKey: 'mark', start: 1, end: 16 },
-    { bookKey: '1peter', start: 1, end: 5 },
-    { bookKey: '2peter', start: 1, end: 3 },
-    { bookKey: '1john', start: 1, end: 5 },
-    { bookKey: '2john', start: 1, end: 1 },
-    { bookKey: '3john', start: 1, end: 1 },
-  ],
-  '2027-2028': [{ bookKey: 'isaiah', start: 34, end: 66 }],
+let chaptersByYear = {};
+
+const loadChaptersByYear = async () => {
+  if (Object.keys(chaptersByYear).length) return chaptersByYear;
+  try {
+    const response = await fetch('chaptersByYear.json');
+    if (!response.ok && response.status !== 0) {
+      throw new Error(`Failed to load chaptersByYear.json: ${response.status}`);
+    }
+    const text = await response.text();
+    chaptersByYear = JSON.parse(text);
+  } catch (err) {
+    console.error('Unable to load chaptersByYear.json', err);
+    throw err;
+  }
+  return chaptersByYear;
 };
+
+
 
 /**
  * Sorts chapter keys numerically by book ID and chapter number
@@ -1215,6 +705,18 @@ const getSelectionsForYear = (year) => {
     }
     return false;
   });
+};
+
+// Returns chapters to render, including intro (0) when commentary exists and range includes chapter 1
+const chaptersToRender = (meta, start, end) => {
+  const chapters = [];
+  if (meta?.commentary?.length && start <= 1) {
+    chapters.push(0);
+  }
+  for (let c = start; c <= end; c += 1) {
+    chapters.push(c);
+  }
+  return chapters;
 };
 
 const defaultState = {
@@ -1775,7 +1277,7 @@ const formatYearSelectionDescription = (yearKey, yearSelections, bookMetaMap) =>
 const renderYearOptions = (selectedYear = '') => {
   seasonSelect.innerHTML = '';
 
-  const yearKeys = Object.keys(chaptersByYear).filter(key => key !== 'defaultYear');
+  const yearKeys = Object.keys(chaptersByYear);
   const currentYearKey = computeCurrentYearKey(yearKeys);
 
   yearKeys.forEach((yearKey) => {
@@ -1808,6 +1310,7 @@ const renderChapterOptions = (year, selectedValues = new Set()) => {
     const meta = books[bookKey];
     if (!meta) return;
     const cappedEnd = Math.min(end, meta.totalChapters);
+    const chapterList = chaptersToRender(meta, start, cappedEnd);
 
     const group = document.createElement('div');
     group.className = 'book-group';
@@ -1830,7 +1333,7 @@ const renderChapterOptions = (year, selectedValues = new Set()) => {
 
     const chapterCheckboxes = [];
 
-    for (let chapter = start; chapter <= cappedEnd; chapter += 1) {
+    chapterList.forEach((chapter) => {
       const chapterKey = `${meta.id},${chapter}`;
       const label = document.createElement('label');
       label.className = 'chapter-check';
@@ -1843,7 +1346,7 @@ const renderChapterOptions = (year, selectedValues = new Set()) => {
 
       const numberSpan = document.createElement('span');
       numberSpan.className = 'chapter-number';
-      numberSpan.textContent = chapter;
+      numberSpan.textContent = chapter === 0 ? 'Intro (ABC)' : chapter;
 
       const status = appState.chapterIndex[chapterKey]?.status || STATUS.NOT_DOWNLOADED;
       const statusSpan = document.createElement('span');
@@ -1855,7 +1358,7 @@ const renderChapterOptions = (year, selectedValues = new Set()) => {
       label.appendChild(statusSpan);
       grid.appendChild(label);
       chapterCheckboxes.push(input);
-    }
+    });
 
     group.appendChild(grid);
     optionsContainer.appendChild(group);
@@ -1925,6 +1428,89 @@ const applyYearExclusions = (yearKey) => {
     exclusions[chapterKey] = Array.from(buildExclusionSetFromInclusions(total, sel.include));
   });
   appState.chapterExclusions = exclusions;
+};
+
+const seedCommentaryContent = async () => {
+  const savePromises = [];
+
+  Object.values(books).forEach((book) => {
+    if (!book.commentary || book.commentary.length === 0) return;
+    const chapterKey = `${book.id},0`;
+    if (appState.chapterIndex[chapterKey]?.verseIds?.length) return;
+
+    const verseIds = [];
+    const versesToSave = [];
+    let idx = 1;
+    book.commentary.forEach((section) => {
+      (section.parts || []).forEach((part) => {
+        const verseId = `${book.id},0,${idx}`;
+        const plainText = `${section.title}. ${part}`;
+        const words = tokenizeText(stripHtml(plainText));
+        const termFrequency = calculateTermFrequency(words);
+        const wordList = Array.from(new Set(words));
+        const text = `<strong>${section.title}.</strong> ${part}`;
+
+        // Update in-memory state
+        appState.verseBank[verseId] = {
+          bookId: book.id,
+          chapter: 0,
+          verse: idx,
+          text,
+          source: 'ABC',
+          termFrequency,
+          wordList,
+        };
+
+        // Prepare verse for IndexedDB
+        versesToSave.push({
+          verseId,
+          chapterKey,
+          bookId: book.id,
+          chapter: 0,
+          verse: idx,
+          text,
+          source: 'ABC',
+          termFrequency,
+          wordList,
+          downloadedAt: new Date().toISOString()
+        });
+
+        verseIds.push(verseId);
+        idx += 1;
+      });
+    });
+
+    appState.chapterIndex[chapterKey] = {
+      verseIds: sortVerseIds(verseIds),
+      lastUpdated: new Date().toISOString(),
+      status: STATUS.READY,
+      verseCount: verseIds.length,
+      chapter: 0,
+    };
+    appState.chapterVerseCounts[chapterKey] = verseIds.length;
+
+    // Save to IndexedDB
+    const saveTask = (async () => {
+      try {
+        await saveChapter({
+          chapterKey,
+          bookId: book.id,
+          chapter: 0,
+          status: STATUS.READY,
+          lastUpdated: new Date().toISOString(),
+          verseCount: verseIds.length
+        });
+        await saveVerses(versesToSave);
+      } catch (err) {
+        console.warn(`Failed to save ABC content for ${book.label} to IndexedDB:`, err);
+      }
+    })();
+
+    savePromises.push(saveTask);
+  });
+
+  // Wait for all saves to complete
+  await Promise.all(savePromises);
 };
 
 const buildVerseDownloadPlan = (activeChapters = [], verseSelections = {}) => {
@@ -1999,6 +1585,7 @@ const renderVerseOptions = (year, selectedValues = new Set()) => {
     const meta = books[bookKey];
     if (!meta) return;
     const cappedEnd = Math.min(end, meta.totalChapters);
+    const chapterList = chaptersToRender(meta, start, cappedEnd);
 
     const group = document.createElement('div');
     group.className = 'book-group';
@@ -2018,7 +1605,7 @@ const renderVerseOptions = (year, selectedValues = new Set()) => {
 
     const bookChapters = [];
 
-    for (let chapter = start; chapter <= cappedEnd; chapter += 1) {
+    chapterList.forEach((chapter) => {
       const chapterKey = `${meta.id},${chapter}`;
       const selection = appState.verseSelections?.[chapterKey];
       const chapterSelected = selectedValues.has(chapterKey);
@@ -2039,7 +1626,7 @@ const renderVerseOptions = (year, selectedValues = new Set()) => {
       chapterCheckbox.checked = allSelected || (verseNumbers.length > 0 && verseNumbers.every((v) => selectedVerses.has(v)));
       const numberSpan = document.createElement('span');
       numberSpan.className = 'chapter-number';
-      numberSpan.textContent = `Chapter ${chapter}`;
+      numberSpan.textContent = chapter === 0 ? 'Intro' : `Chapter ${chapter}`;
       const statusSpan = document.createElement('span');
       statusSpan.className = `chapter-status${status ? ` ${status}` : ''}`;
       statusSpan.textContent = statusLabelFor(status);
@@ -2065,6 +1652,9 @@ const renderVerseOptions = (year, selectedValues = new Set()) => {
           const verseId = `${chapterKey},${verseNum}`;
           const verseLabel = document.createElement('label');
           verseLabel.className = 'chapter-check verse-check';
+          if (chapter === 0) {
+            verseLabel.classList.add('commentary-entry');
+          }
 
           const input = document.createElement('input');
           input.type = 'checkbox';
@@ -2074,7 +1664,11 @@ const renderVerseOptions = (year, selectedValues = new Set()) => {
 
           const number = document.createElement('span');
           number.className = 'chapter-number';
-          number.textContent = verseNum;
+          const commentaryLabel = getCommentaryLabelForPart(chapterKey, verseNum);
+          if (commentaryLabel) {
+            number.classList.add('commentary-label');
+          }
+          number.textContent = commentaryLabel || verseNum;
 
           const verseStatus = document.createElement('span');
           const currentStatus = verseStatusFor(chapterKey, verseId);
@@ -2091,23 +1685,23 @@ const renderVerseOptions = (year, selectedValues = new Set()) => {
 
           input.addEventListener('change', () => {
             ensureVerseSelectionEntry(chapterKey);
-        const selectionEntry = appState.verseSelections[chapterKey];
-        const set = new Set(selectionEntry.selectedVerses || []);
-        if (input.checked) {
-          set.add(verseNum);
-        } else {
-          set.delete(verseNum);
-        }
-        const totalVerses = verseNumbers.length;
-        const chapterStatus = getChapterStatus(chapterKey);
-        const hasCompleteSelection =
-          totalVerses > 0 && set.size === totalVerses && chapterStatus === STATUS.READY;
-        if (hasCompleteSelection) {
-          selectionEntry.allSelected = true;
-          selectionEntry.selectedVerses = [];
-        } else {
-          selectionEntry.allSelected = false;
-          selectionEntry.selectedVerses = Array.from(set);
+            const selectionEntry = appState.verseSelections[chapterKey];
+            const set = new Set(selectionEntry.selectedVerses || []);
+            if (input.checked) {
+              set.add(verseNum);
+            } else {
+              set.delete(verseNum);
+            }
+            const totalVerses = verseNumbers.length;
+            const chapterStatus = getChapterStatus(chapterKey);
+            const hasCompleteSelection =
+              totalVerses > 0 && set.size === totalVerses && chapterStatus === STATUS.READY;
+            if (hasCompleteSelection) {
+              selectionEntry.allSelected = true;
+              selectionEntry.selectedVerses = [];
+            } else {
+              selectionEntry.allSelected = false;
+              selectionEntry.selectedVerses = Array.from(set);
             }
             handleVerseSelectionChange(chapterKey, bookKey);
             updateChapterToggleState(chapterKey);
@@ -2145,7 +1739,7 @@ const renderVerseOptions = (year, selectedValues = new Set()) => {
       verseChapterToggleMap.set(chapterKey, chapterEntry);
       verseChapterToBook.set(chapterKey, bookKey);
       bookChapters.push(chapterEntry);
-    }
+    });
 
     verseBookToggleMap.set(bookKey, { checkbox: bookCheckbox, chapters: bookChapters });
     bookCheckbox.addEventListener('change', (event) => {
@@ -2367,6 +1961,36 @@ const getChapterInclusions = (chapterKey) => {
   return matching?.include || null;
 };
 
+const getCommentarySectionCount = (chapterKey) => {
+  const { bookId, chapter } = getChapterMeta(chapterKey);
+  if (chapter !== 0) return null;
+  const bookMeta = Object.values(books).find((b) => b.id === bookId);
+  if (!bookMeta?.commentary) return null;
+  return bookMeta.commentary.reduce((acc, section) => acc + (section.parts?.length || 0), 0);
+};
+
+const getCommentaryLabelForPart = (chapterKey, partIndex) => {
+  const { bookId, chapter } = getChapterMeta(chapterKey);
+  if (chapter !== 0 || !Number.isFinite(partIndex) || partIndex < 1) return null;
+  const bookMeta = Object.values(books).find((b) => b.id === bookId);
+  if (!bookMeta?.commentary) return null;
+
+  let idx = 0;
+  for (const section of bookMeta.commentary) {
+    const parts = Array.isArray(section?.parts) ? section.parts : [];
+    for (let i = 0; i < parts.length; i += 1) {
+      idx += 1;
+      if (idx === partIndex) {
+        const title = section?.title || 'Intro';
+        // Only show part number if there is more than one part
+        if (parts.length > 1) return `${title} (Part ${i + 1}/${parts.length})`;
+        return title;
+      }
+    }
+  }
+  return null;
+};
+
 const allowedVersesFromInclusions = (totalVerses, includeRanges = []) => {
   const allowed = new Set();
   includeRanges.forEach(([start, end]) => {
@@ -2380,6 +2004,10 @@ const allowedVersesFromInclusions = (totalVerses, includeRanges = []) => {
 const getVerseNumbersForChapter = (chapterKey) => {
   const entry = appState.chapterIndex[chapterKey];
   const { bookId, chapter } = getChapterMeta(chapterKey);
+  const commentaryCount = getCommentarySectionCount(chapterKey);
+  if (chapter === 0 && Number.isFinite(commentaryCount) && commentaryCount > 0) {
+    return Array.from({ length: commentaryCount }, (_, idx) => idx + 1);
+  }
   const metaCount = getMetaVerseCount(bookId, chapter);
   const cached = appState.chapterVerseCounts?.[chapterKey];
   const verseIds = entry?.verseIds || [];
@@ -2834,6 +2462,8 @@ const downloadChapterIfNeeded = (chapterKey) => {
 
 const startDownloadsForSelection = () => {
   const needed = appState.activeChapters.filter((chapterKey) => {
+    const [, chapterStr] = chapterKey.split(',');
+    if (Number(chapterStr) === 0) return false;
     const entry = appState.chapterIndex[chapterKey];
     const selection = appState.verseSelections?.[chapterKey];
     return shouldDownloadFullChapter(selection, entry);
@@ -2975,7 +2605,16 @@ const verseReference = (verseId) => {
   const bookId = Number(bookIdStr);
   const chapter = Number(chapterStr);
   const verse = Number(verseStr);
-  const bookLabel = Object.values(books).find((b) => b.id === bookId)?.label || `Book ${bookId}`;
+  const bookMeta = Object.values(books).find((b) => b.id === bookId);
+  const bookLabel = bookMeta?.label || `Book ${bookId}`;
+
+  // Handle ABC (Andrew's Bible Commentary) - chapter 0
+  if (chapter === 0) {
+    const chapterKey = `${bookId},${chapter}`;
+    const commentaryLabel = getCommentaryLabelForPart(chapterKey, verse);
+    return commentaryLabel ? `ABC - ${commentaryLabel}` : `ABC - ${bookLabel}`;
+  }
+
   return `${bookLabel} ${chapter}:${verse} (NKJV)`;
 };
 
@@ -3646,6 +3285,8 @@ const handleMaxPercentChange = (evt) => {
 
 // Initialize app with async state loading
 (async () => {
+  await loadBooksData();
+  await loadChaptersByYear();
   const initialState = await loadState();
   if (initialState) {
     appState = initialState;
@@ -3655,14 +3296,15 @@ const handleMaxPercentChange = (evt) => {
 
   // Apply default year for new users if no year is selected
   if (!appState.year) {
-    const yearKeys = Object.keys(chaptersByYear).filter((k) => k !== 'defaultYear');
-    const currentKey = computeCurrentYearKey(yearKeys);
-    appState.year = currentKey || chaptersByYear.defaultYear || yearKeys[0] || '';
+  const yearKeys = Object.keys(chaptersByYear);
+  const currentKey = computeCurrentYearKey(yearKeys);
+  appState.year = currentKey || yearKeys[0] || '';
   }
 
   if (appState.year) {
     applyYearExclusions(appState.year);
   }
+  await seedCommentaryContent();
 
   activeSelector = appState.activeSelector === 'verse' ? 'verse' : 'chapter';
   renderYearOptions(appState.year);
