@@ -2460,6 +2460,16 @@ const downloadChapterIfNeeded = (chapterKey) => {
   return downloadPromise;
 };
 
+const shouldDownloadFullChapter = (selection, chapterEntry) => {
+  if (selection && selection.allSelected === false && selection.all !== true && (selection.selectedVerses || selection.verses)) {
+    // Explicit verse-only selection: do NOT download the whole chapter
+    return false;
+  }
+
+  const ready = chapterEntry?.status === STATUS.READY && Array.isArray(chapterEntry?.verseIds) && chapterEntry.verseIds.length > 0;
+  return !ready;
+};
+
 const startDownloadsForSelection = () => {
   const needed = appState.activeChapters.filter((chapterKey) => {
     const [, chapterStr] = chapterKey.split(',');
