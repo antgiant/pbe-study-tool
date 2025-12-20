@@ -1229,7 +1229,25 @@ const updateStartState = () => {
       return entry && isSelectionComplete(selection, entry);
     });
   const hasVerses = appState.activeVerseIds.length > 0;
-  startButton.disabled = !anySelected || anyDownloads || !allReady || !hasVerses;
+  const percentagesValid = validateQuestionTypePercentages();
+  const isDisabled = !anySelected || anyDownloads || !allReady || !hasVerses || !percentagesValid;
+
+  startButton.disabled = isDisabled;
+
+  // Update aria-label to provide helpful feedback
+  if (isDisabled) {
+    if (!anySelected || !hasVerses) {
+      startButton.setAttribute('aria-label', 'Start quiz - disabled until verses are selected');
+    } else if (anyDownloads) {
+      startButton.setAttribute('aria-label', 'Start quiz - disabled while downloading verses');
+    } else if (!percentagesValid) {
+      startButton.setAttribute('aria-label', 'Start quiz - disabled until question type percentages total 100%');
+    } else {
+      startButton.setAttribute('aria-label', 'Start quiz - disabled until all verses are ready');
+    }
+  } else {
+    startButton.setAttribute('aria-label', 'Start quiz');
+  }
 };
 
 const updateBookToggleStates = () => {
@@ -3389,8 +3407,9 @@ const handleFillInBlankPercentageChange = () => {
   const value = Math.max(0, Math.min(toInt(fillInBlankPercentageInput.value, 100), 100));
   appState.fillInBlankPercentage = value;
 
-  // Validate the total distribution
+  // Validate the total distribution and update start button state
   validateQuestionTypePercentages();
+  updateStartState();
   saveState();
 };
 

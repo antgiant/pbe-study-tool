@@ -33,13 +33,20 @@ const buildDom = () => {
             <input type="number" id="min-blanks" name="min-blanks" min="1" value="1" step="1" inputmode="numeric" />
             <label for="max-blanks">Max blanks</label>
             <input type="number" id="max-blanks" name="max-blanks" min="1" value="1" step="1" inputmode="numeric" />
+            <div id="blank-limit" class="hint">Max allowed is 1 based on selected verses.</div>
             <label for="max-blank-percentage">Max percentage blank</label>
             <input type="number" id="max-blank-percentage" name="max-blank-percentage" min="1" max="100" value="100" step="1" inputmode="numeric" />
             <label for="use-only-percentage" class="checkbox-label">
               <input type="checkbox" id="use-only-percentage" name="use-only-percentage" />
               Use only percentage
             </label>
-            <div id="blank-limit" class="hint">Max allowed is 1 based on selected verses.</div>
+          </fieldset>
+          <fieldset id="question-type-split">
+            <legend>Question Type Split (must total 100%)</legend>
+            <label for="fill-in-blank-percentage">Fill in the Blank Percentage</label>
+            <input type="number" id="fill-in-blank-percentage" name="fill-in-blank-percentage" min="0" max="100" value="100" step="1" inputmode="numeric" aria-describedby="fill-in-blank-percentage-error" data-question-type-percentage required />
+            <div id="fill-in-blank-percentage-error" aria-live="polite" aria-atomic="true" class="validation-feedback"></div>
+            <div id="question-type-total" aria-live="polite" aria-atomic="true" class="hint">Total: <span id="question-type-total-value">100</span>%</div>
           </fieldset>
         </div>
       </div>
