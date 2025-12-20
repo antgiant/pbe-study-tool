@@ -27,6 +27,7 @@ const hintButton = document.getElementById('hint-button');
 const minBlanksInput = document.getElementById('min-blanks');
 const maxBlanksInput = document.getElementById('max-blanks');
 const maxBlankPercentageInput = document.getElementById('max-blank-percentage');
+const useOnlyPercentageInput = document.getElementById('use-only-percentage');
 const blankLimitHint = document.getElementById('blank-limit');
 
 const STORAGE_KEY = 'pbeSettings';
@@ -441,6 +442,7 @@ const migrateToOptimizedSchema = async (oldState) => {
       minBlanks: oldState.minBlanks || 1,
       maxBlanks: oldState.maxBlanks || 1,
       maxBlankPercentage: oldState.maxBlankPercentage || 100,
+      useOnlyPercentage: oldState.useOnlyPercentage || false,
       lastUpdated: new Date().toISOString()
     };
     await updateSettings(settings);
@@ -585,6 +587,7 @@ const buildPersistableState = (includeVerses = true) => {
     minBlanks: appState.minBlanks,
     maxBlanks: appState.maxBlanks,
     maxBlankPercentage: appState.maxBlankPercentage,
+    useOnlyPercentage: appState.useOnlyPercentage,
   };
 };
 
@@ -738,6 +741,7 @@ const defaultState = {
     chapterLevel: {},
   },
   maxBlankPercentage: 100,
+  useOnlyPercentage: false,
 };
 
 let appState = { ...defaultState };
@@ -871,6 +875,7 @@ const loadState = async () => {
       minBlanks: settings.minBlanks || 1,
       maxBlanks: settings.maxBlanks || 1,
       maxBlankPercentage: settings.maxBlankPercentage || 100,
+      useOnlyPercentage: settings.useOnlyPercentage || false,
       // Sort activeChapters numerically when loading from database
       activeChapters: sortChapterKeys(selections?.activeChapters || []),
       verseSelections: selections?.verseSelections || {},
@@ -905,6 +910,7 @@ const saveState = async () => {
       minBlanks: appState.minBlanks,
       maxBlanks: appState.maxBlanks,
       maxBlankPercentage: appState.maxBlankPercentage,
+      useOnlyPercentage: appState.useOnlyPercentage,
       lastUpdated: new Date().toISOString()
     };
     await updateSettings(settings);
@@ -1139,6 +1145,14 @@ const updateBlankInputs = () => {
     maxBlanksInput.value = appState.maxBlanks;
     maxBlankPercentageInput.value = appState.maxBlankPercentage;
 
+    if (appState.useOnlyPercentage) {
+      minBlanksInput.disabled = true;
+      maxBlanksInput.disabled = true;
+    } else {
+      minBlanksInput.disabled = false;
+      maxBlanksInput.disabled = false;
+    }
+
     blankLimitHint.textContent = 'Select at least one verse or chapter to compute blank limits.';
     saveState();
     return;
@@ -1157,6 +1171,12 @@ const updateBlankInputs = () => {
     minVal = maxVal;
   }
 
+  // If use-only-percentage is enabled, force both min and max to the allowed maximum and disable inputs
+  if (appState.useOnlyPercentage) {
+    minVal = allowedMax;
+    maxVal = allowedMax;
+  }
+
   appState.minBlanks = minVal;
   appState.maxBlanks = maxVal;
   appState.maxBlankPercentage = percentVal;
@@ -1171,6 +1191,19 @@ const updateBlankInputs = () => {
   minBlanksInput.value = appState.minBlanks;
   maxBlanksInput.value = appState.maxBlanks;
   maxBlankPercentageInput.value = appState.maxBlankPercentage;
+
+  // Reflect the checkbox state in the UI
+  if (useOnlyPercentageInput) {
+    useOnlyPercentageInput.checked = !!appState.useOnlyPercentage;
+  }
+
+  if (appState.useOnlyPercentage) {
+    minBlanksInput.disabled = true;
+    maxBlanksInput.disabled = true;
+  } else {
+    minBlanksInput.disabled = false;
+    maxBlanksInput.disabled = false;
+  }
 
   blankLimitHint.textContent = `Max allowed is ${allowedMax} based on selected verses and ${appState.maxBlankPercentage}% cap.`;
   saveState();
@@ -3325,6 +3358,14 @@ const handleMaxPercentChange = (evt) => {
   maxBlankPercentageInput.addEventListener(evt, handleMaxPercentChange);
 });
 
+// Wire up the "use only percentage" checkbox
+if (useOnlyPercentageInput) {
+  useOnlyPercentageInput.addEventListener('change', () => {
+    appState.useOnlyPercentage = useOnlyPercentageInput.checked;
+    updateBlankInputs();
+  });
+}
+
 // Normalize blank fields on blur so typing isn't interrupted by live validation
 [minBlanksInput, maxBlanksInput, maxBlankPercentageInput].forEach((input) => {
   input.addEventListener('blur', () => {
@@ -3341,6 +3382,8 @@ if (typeof window !== 'undefined' && window.__PBE_EXPOSE_TEST_API__) {
     recomputeActiveVerseIds,
     handleMinBlanksChange,
     handleMaxBlanksChange,
+    saveState,
+    loadState,
   };
 }
 

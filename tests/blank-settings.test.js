@@ -33,6 +33,10 @@ const buildDom = () => {
             <input type="number" id="max-blanks" name="max-blanks" min="1" value="1" step="1" inputmode="numeric" />
             <label for="max-blank-percentage">Max percentage blank</label>
             <input type="number" id="max-blank-percentage" name="max-blank-percentage" min="1" max="100" value="100" step="1" inputmode="numeric" />
+            <label for="use-only-percentage" class="checkbox-label">
+              <input type="checkbox" id="use-only-percentage" name="use-only-percentage" />
+              Use only percentage
+            </label>
             <div id="blank-limit" class="hint">Max allowed is 1 based on selected verses.</div>
           </fieldset>
         </div>
@@ -123,5 +127,67 @@ describe('Blank settings', () => {
     expect(appState.minBlanks).toBe(2);
     expect(appState.maxBlanks).toBe(5);
     expect(hint.textContent).toContain('Select at least one verse or chapter');
+  });
+
+  it('when "use only percentage" checked, min and max are set to allowed max and disabled', () => {
+    const { appState, updateBlankInputs } = testApi;
+
+    const minInput = document.getElementById('min-blanks');
+    const maxInput = document.getElementById('max-blanks');
+    const percentInput = document.getElementById('max-blank-percentage');
+    const useOnly = document.getElementById('use-only-percentage');
+
+    // Verse with 10 words -> allowedMax at 50% = 5
+    Object.assign(appState, {
+      activeChapters: ['1,1'],
+      activeVerseIds: ['1,1,1'],
+      verseSelections: {},
+      chapterIndex: {},
+      verseBank: {
+        '1,1,1': { text: 'One two three four five six seven eight nine ten' },
+      },
+      minBlanks: 1,
+      maxBlanks: 5,
+      maxBlankPercentage: 50,
+    });
+
+    percentInput.value = '50';
+    useOnly.checked = true;
+    // Simulate user toggling the checkbox
+    useOnly.dispatchEvent(new Event('change'));
+
+    updateBlankInputs();
+
+    expect(minInput.value).toBe('5');
+    expect(maxInput.value).toBe('5');
+    expect(minInput.disabled).toBe(true);
+    expect(maxInput.disabled).toBe(true);
+
+    // Now uncheck and verify inputs are re-enabled and behave normally
+    useOnly.checked = false;
+    useOnly.dispatchEvent(new Event('change'));
+    updateBlankInputs();
+
+    expect(minInput.disabled).toBe(false);
+    expect(maxInput.disabled).toBe(false);
+  });
+
+  it('persists the "use only percentage" setting across reloads', async () => {
+    const { appState, updateBlankInputs, saveState, loadState } = testApi;
+
+    const useOnly = document.getElementById('use-only-percentage');
+
+    // Set and save
+    appState.useOnlyPercentage = true;
+    useOnly.checked = true;
+    useOnly.dispatchEvent(new Event('change'));
+    updateBlankInputs();
+    await saveState();
+
+    // Simulate reload by clearing in-memory appState and reloading from storage
+    Object.assign(appState, { useOnlyPercentage: false });
+    const reloaded = await loadState();
+
+    expect(reloaded.useOnlyPercentage).toBe(true);
   });
 });
