@@ -1248,6 +1248,7 @@ const toggleSelectors = (forceState) => {
       : selectorsContainer.classList.contains('collapsed') === false;
   selectorsContainer.classList.toggle('collapsed', shouldCollapse);
   selectorsToggle.textContent = shouldCollapse ? 'Settings ▸' : 'Settings ▾';
+  selectorsToggle.setAttribute('aria-expanded', shouldCollapse ? 'false' : 'true');
   startButton.style.display = shouldCollapse ? 'none' : 'inline-flex';
 
   // Hide question and answer areas when settings are visible
@@ -3288,13 +3289,11 @@ hintButton.addEventListener('click', revealHint);
 answerNextButton.addEventListener('click', goNextFromAnswer);
 answerPrevButton.addEventListener('click', goPrevFromAnswer);
 
-toggleToVerseLink.addEventListener('click', (event) => {
-  event.preventDefault();
+toggleToVerseLink.addEventListener('click', () => {
   showSelectorView('verse');
 });
 
-toggleToChapterLink.addEventListener('click', (event) => {
-  event.preventDefault();
+toggleToChapterLink.addEventListener('click', () => {
   showSelectorView('chapter');
 });
 

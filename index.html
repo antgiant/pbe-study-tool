@@ -12,8 +12,8 @@
     <h1>PBE Study Tool</h1>
     <p>A tool to help you learn PBE verses by practicing fill in the blank questions.</p>
     <div class="selectors" id="selectors-container">
-      <button type="button" id="selectors-toggle" class="accordion-toggle">Settings ▾</button>
-      <div id="selectors-content">
+      <button type="button" id="selectors-toggle" class="accordion-toggle" aria-expanded="true" aria-controls="selectors-content">Settings ▾</button>
+      <div id="selectors-content" role="region" aria-labelledby="selectors-toggle">
         <fieldset>
           <legend>Season</legend>
           <label for="year">Year</label>
@@ -23,14 +23,14 @@
         <fieldset id="chapter-selector" style="display: none;">
           <legend class="fieldset-header">
             <span>Chapter selector</span>
-            <a href="#" id="toggle-to-verse" class="selector-toggle">Verse selector</a>
+            <button type="button" id="toggle-to-verse" class="selector-toggle">Verse selector</button>
           </legend>
           <div id="chapter-options"></div>
         </fieldset>
         <fieldset id="verse-selector" style="display: none;">
           <legend class="fieldset-header">
             <span>Verse selector</span>
-            <a href="#" id="toggle-to-chapter" class="selector-toggle">Chapter selector</a>
+            <button type="button" id="toggle-to-chapter" class="selector-toggle">Chapter selector</button>
           </legend>
           <div id="verse-options"></div>
         </fieldset>
@@ -50,34 +50,34 @@
         </fieldset>
       </div>
     </div>
-    <button type="button" id="start-button" disabled>Start</button>
-    <div id="question-area" class="question-card" style="display: none;">
+    <button type="button" id="start-button" disabled aria-label="Start quiz - disabled until verses are selected">Start</button>
+    <div id="question-area" class="question-card" style="display: none;" role="region" aria-label="Question">
       <div class="question-header">
         <span id="question-title">Question 1</span>
-        <button type="button" id="hint-button" class="hint-button">Hint</button>
-        <span id="question-points" class="question-points"></span>
+        <button type="button" id="hint-button" class="hint-button" aria-label="Show hint for current question">Hint</button>
+        <span id="question-points" class="question-points" aria-label="Points available"></span>
       </div>
       <div class="question-subline">
         <span id="question-reference" class="question-reference"></span>
       </div>
-      <p id="question-text" class="question-text"></p>
+      <p id="question-text" class="question-text" role="status" aria-live="polite"></p>
       <div class="question-actions">
-        <button type="button" id="prev-button" disabled>Previous</button>
-        <button type="button" id="next-button">Next</button>
+        <button type="button" id="prev-button" disabled aria-label="Previous question">Previous</button>
+        <button type="button" id="next-button" aria-label="Show answer">Next</button>
       </div>
     </div>
-    <div id="answer-area" class="question-card" style="display: none;">
+    <div id="answer-area" class="question-card" style="display: none;" role="region" aria-label="Answer">
       <div class="question-header">
         <p id="answer-title">Answer</p>
-        <span id="answer-points" class="question-points"></span>
+        <span id="answer-points" class="question-points" aria-label="Points earned"></span>
       </div>
       <div class="question-subline">
         <span id="answer-reference" class="question-reference"></span>
       </div>
-      <p id="answer-text" class="question-text"></p>
+      <p id="answer-text" class="question-text" role="status" aria-live="polite"></p>
       <div class="question-actions">
-        <button type="button" id="answer-prev-button" disabled>Previous</button>
-        <button type="button" id="answer-next-button">Next</button>
+        <button type="button" id="answer-prev-button" disabled aria-label="Previous answer">Previous</button>
+        <button type="button" id="answer-next-button" aria-label="Next question">Next</button>
       </div>
     </div>
   </div>

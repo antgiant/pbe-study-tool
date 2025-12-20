@@ -67,10 +67,20 @@ legend {
   color: #fbd38d;
   text-decoration: none;
   font-weight: 600;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
 }
 
 .selector-toggle:hover {
   text-decoration: underline;
+}
+
+.selector-toggle:focus {
+  outline: 2px solid #fbd38d;
+  outline-offset: 2px;
 }
 
 select {
