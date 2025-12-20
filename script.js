@@ -29,8 +29,11 @@ const maxBlanksInput = document.getElementById('max-blanks');
 const minBlanksError = document.getElementById('min-blanks-error');
 const maxBlanksError = document.getElementById('max-blanks-error');
 const maxBlankPercentageInput = document.getElementById('max-blank-percentage');
+const maxBlankPercentageLabel = document.querySelector('label[for="max-blank-percentage"]');
 const useOnlyPercentageInput = document.getElementById('use-only-percentage');
 const blankLimitHint = document.getElementById('blank-limit');
+const minBlanksLabel = document.querySelector('label[for="min-blanks"]');
+const maxBlanksLabel = document.querySelector('label[for="max-blanks"]');
 const fillInBlankPercentageInput = document.getElementById('fill-in-blank-percentage');
 const questionTypeTotalValue = document.getElementById('question-type-total-value');
 
@@ -1155,11 +1158,41 @@ const updateBlankInputs = () => {
     maxBlankPercentageInput.value = appState.maxBlankPercentage;
 
     if (appState.useOnlyPercentage) {
+      // Hide min/max blanks inputs and labels
       minBlanksInput.disabled = true;
       maxBlanksInput.disabled = true;
+      minBlanksInput.style.display = 'none';
+      maxBlanksInput.style.display = 'none';
+      if (minBlanksLabel) minBlanksLabel.style.display = 'none';
+      if (maxBlanksLabel) maxBlanksLabel.style.display = 'none';
+      if (minBlanksError) minBlanksError.style.display = 'none';
+      if (maxBlanksError) maxBlanksError.style.display = 'none';
+
+      // Hide the hint
+      if (blankLimitHint) blankLimitHint.style.display = 'none';
+
+      // Change label to "Percent Blank"
+      if (maxBlankPercentageLabel) {
+        maxBlankPercentageLabel.textContent = 'Percent Blank';
+      }
     } else {
+      // Show min/max blanks inputs and labels
       minBlanksInput.disabled = false;
       maxBlanksInput.disabled = false;
+      minBlanksInput.style.display = '';
+      maxBlanksInput.style.display = '';
+      if (minBlanksLabel) minBlanksLabel.style.display = '';
+      if (maxBlanksLabel) maxBlanksLabel.style.display = '';
+      if (minBlanksError) minBlanksError.style.display = '';
+      if (maxBlanksError) maxBlanksError.style.display = '';
+
+      // Show the hint
+      if (blankLimitHint) blankLimitHint.style.display = '';
+
+      // Change label back to "Max percentage blank"
+      if (maxBlankPercentageLabel) {
+        maxBlankPercentageLabel.textContent = 'Max percentage blank';
+      }
     }
 
     blankLimitHint.textContent = 'Select at least one verse or chapter to compute blank limits.';
@@ -1204,11 +1237,41 @@ const updateBlankInputs = () => {
   }
 
   if (appState.useOnlyPercentage) {
+    // Hide min/max blanks inputs and labels
     minBlanksInput.disabled = true;
     maxBlanksInput.disabled = true;
+    minBlanksInput.style.display = 'none';
+    maxBlanksInput.style.display = 'none';
+    if (minBlanksLabel) minBlanksLabel.style.display = 'none';
+    if (maxBlanksLabel) maxBlanksLabel.style.display = 'none';
+    if (minBlanksError) minBlanksError.style.display = 'none';
+    if (maxBlanksError) maxBlanksError.style.display = 'none';
+
+    // Hide the hint
+    if (blankLimitHint) blankLimitHint.style.display = 'none';
+
+    // Change label to "Percent Blank"
+    if (maxBlankPercentageLabel) {
+      maxBlankPercentageLabel.textContent = 'Percent Blank';
+    }
   } else {
+    // Show min/max blanks inputs and labels
     minBlanksInput.disabled = false;
     maxBlanksInput.disabled = false;
+    minBlanksInput.style.display = '';
+    maxBlanksInput.style.display = '';
+    if (minBlanksLabel) minBlanksLabel.style.display = '';
+    if (maxBlanksLabel) maxBlanksLabel.style.display = '';
+    if (minBlanksError) minBlanksError.style.display = '';
+    if (maxBlanksError) maxBlanksError.style.display = '';
+
+    // Show the hint
+    if (blankLimitHint) blankLimitHint.style.display = '';
+
+    // Change label back to "Max percentage blank"
+    if (maxBlankPercentageLabel) {
+      maxBlankPercentageLabel.textContent = 'Max percentage blank';
+    }
   }
 
   blankLimitHint.textContent = `Max allowed is ${allowedMax} based on selected verses and ${appState.maxBlankPercentage}% cap.`;
