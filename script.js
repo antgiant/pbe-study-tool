@@ -29,6 +29,8 @@ const maxBlanksInput = document.getElementById('max-blanks');
 const maxBlankPercentageInput = document.getElementById('max-blank-percentage');
 const useOnlyPercentageInput = document.getElementById('use-only-percentage');
 const blankLimitHint = document.getElementById('blank-limit');
+const fillInBlankPercentageInput = document.getElementById('fill-in-blank-percentage');
+const questionTypeTotalValue = document.getElementById('question-type-total-value');
 
 const STORAGE_KEY = 'pbeSettings';
 const SELECTIONS_KEY = 'pbeSelections';
@@ -443,6 +445,7 @@ const migrateToOptimizedSchema = async (oldState) => {
       maxBlanks: oldState.maxBlanks || 1,
       maxBlankPercentage: oldState.maxBlankPercentage || 100,
       useOnlyPercentage: oldState.useOnlyPercentage || false,
+      fillInBlankPercentage: oldState.fillInBlankPercentage || 100,
       lastUpdated: new Date().toISOString()
     };
     await updateSettings(settings);
@@ -588,6 +591,7 @@ const buildPersistableState = (includeVerses = true) => {
     maxBlanks: appState.maxBlanks,
     maxBlankPercentage: appState.maxBlankPercentage,
     useOnlyPercentage: appState.useOnlyPercentage,
+    fillInBlankPercentage: appState.fillInBlankPercentage,
   };
 };
 
@@ -742,6 +746,7 @@ const defaultState = {
   },
   maxBlankPercentage: 100,
   useOnlyPercentage: false,
+  fillInBlankPercentage: 100,
 };
 
 let appState = { ...defaultState };
@@ -876,6 +881,7 @@ const loadState = async () => {
       maxBlanks: settings.maxBlanks || 1,
       maxBlankPercentage: settings.maxBlankPercentage || 100,
       useOnlyPercentage: settings.useOnlyPercentage || false,
+      fillInBlankPercentage: settings.fillInBlankPercentage || 100,
       // Sort activeChapters numerically when loading from database
       activeChapters: sortChapterKeys(selections?.activeChapters || []),
       verseSelections: selections?.verseSelections || {},
@@ -911,6 +917,7 @@ const saveState = async () => {
       maxBlanks: appState.maxBlanks,
       maxBlankPercentage: appState.maxBlankPercentage,
       useOnlyPercentage: appState.useOnlyPercentage,
+      fillInBlankPercentage: appState.fillInBlankPercentage,
       lastUpdated: new Date().toISOString()
     };
     await updateSettings(settings);
@@ -3351,10 +3358,47 @@ const handleMaxPercentChange = (evt) => {
   }
 };
 
+// Validate that all question type percentages total 100%
+const validateQuestionTypePercentages = () => {
+  const inputs = document.querySelectorAll('[data-question-type-percentage]');
+  const values = Array.from(inputs).map(input => parseFloat(input.value) || 0);
+  const total = values.reduce((sum, val) => sum + val, 0);
+  const isValid = Math.abs(total - 100) < 0.01;
+
+  // Update total display
+  if (questionTypeTotalValue) {
+    questionTypeTotalValue.textContent = total.toFixed(0);
+  }
+
+  // Set custom validity on all question type inputs
+  inputs.forEach(input => {
+    if (isValid) {
+      input.setCustomValidity('');
+    } else {
+      input.setCustomValidity(
+        `Question type distribution must total 100% (currently ${total.toFixed(0)}%)`
+      );
+    }
+  });
+
+  return isValid;
+};
+
+const handleFillInBlankPercentageChange = () => {
+  if (fillInBlankPercentageInput.value === '') return; // allow clearing before entering a new number
+  const value = Math.max(0, Math.min(toInt(fillInBlankPercentageInput.value, 100), 100));
+  appState.fillInBlankPercentage = value;
+
+  // Validate the total distribution
+  validateQuestionTypePercentages();
+  saveState();
+};
+
 ['input', 'change'].forEach((evt) => {
   minBlanksInput.addEventListener(evt, handleMinBlanksChange);
   maxBlanksInput.addEventListener(evt, handleMaxBlanksChange);
   maxBlankPercentageInput.addEventListener(evt, handleMaxPercentChange);
+  fillInBlankPercentageInput.addEventListener(evt, handleFillInBlankPercentageChange);
 });
 
 // Wire up the "use only percentage" checkbox
@@ -3381,6 +3425,7 @@ if (typeof window !== 'undefined' && window.__PBE_EXPOSE_TEST_API__) {
     recomputeActiveVerseIds,
     handleMinBlanksChange,
     handleMaxBlanksChange,
+    validateQuestionTypePercentages,
     saveState,
     loadState,
   };
@@ -3420,6 +3465,7 @@ if (shouldAutoInit) {
 
     installCompromisePlugin();
     toggleChapterSelector();
+    validateQuestionTypePercentages();
     requestPersistentStorage();
   })();
 }

@@ -39,6 +39,13 @@ const buildDom = () => {
             </label>
             <div id="blank-limit" class="hint">Max allowed is 1 based on selected verses.</div>
           </fieldset>
+          <fieldset id="question-type-split">
+            <legend>Question Type Split (must total 100%)</legend>
+            <label for="fill-in-blank-percentage">Fill in the Blank Percentage</label>
+            <input type="number" id="fill-in-blank-percentage" name="fill-in-blank-percentage" min="0" max="100" value="100" step="1" inputmode="numeric" aria-describedby="fill-in-blank-percentage-error" data-question-type-percentage required />
+            <div id="fill-in-blank-percentage-error" aria-live="polite" aria-atomic="true" class="validation-feedback"></div>
+            <div id="question-type-total" aria-live="polite" aria-atomic="true" class="hint">Total: <span id="question-type-total-value">100</span>%</div>
+          </fieldset>
         </div>
       </div>
       <button type="button" id="start-button" disabled>Start</button>
