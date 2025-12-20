@@ -26,6 +26,8 @@ const answerNextButton = document.getElementById('answer-next-button');
 const hintButton = document.getElementById('hint-button');
 const minBlanksInput = document.getElementById('min-blanks');
 const maxBlanksInput = document.getElementById('max-blanks');
+const minBlanksError = document.getElementById('min-blanks-error');
+const maxBlanksError = document.getElementById('max-blanks-error');
 const maxBlankPercentageInput = document.getElementById('max-blank-percentage');
 const useOnlyPercentageInput = document.getElementById('use-only-percentage');
 const blankLimitHint = document.getElementById('blank-limit');
@@ -1169,23 +1171,20 @@ const updateBlankInputs = () => {
   const percentCap = Math.max(1, Math.floor((percentVal / 100) * maxWords));
   const allowedMax = Math.min(maxWords, percentCap);
 
-  let maxVal = Math.max(1, Math.min(toInt(appState.maxBlanks, 1), allowedMax));
-  let minVal = Math.max(1, toInt(appState.minBlanks, 1));
-
-  // Only adjust min down if it exceeds the constrained max value
-  // Don't try to lift max up - respect what the user typed
-  if (minVal > maxVal) {
-    minVal = maxVal;
-  }
-
-  // If use-only-percentage is enabled, force both min and max to the allowed maximum and disable inputs
+  // If use-only-percentage is enabled, set both min and max to the allowed maximum
   if (appState.useOnlyPercentage) {
-    minVal = allowedMax;
-    maxVal = allowedMax;
+    appState.minBlanks = allowedMax;
+    appState.maxBlanks = allowedMax;
   }
 
-  appState.minBlanks = minVal;
-  appState.maxBlanks = maxVal;
+  // Ensure appState values are at least 1 if not set
+  if (!appState.minBlanks || appState.minBlanks < 1) {
+    appState.minBlanks = 1;
+  }
+  if (!appState.maxBlanks || appState.maxBlanks < 1) {
+    appState.maxBlanks = 1;
+  }
+
   appState.maxBlankPercentage = percentVal;
 
   minBlanksInput.min = 1;
@@ -1213,6 +1212,10 @@ const updateBlankInputs = () => {
   }
 
   blankLimitHint.textContent = `Max allowed is ${allowedMax} based on selected verses and ${appState.maxBlankPercentage}% cap.`;
+
+  // Validate the current blank settings (which may now be invalid due to verse selection change)
+  validateBlankInputs();
+
   saveState();
 };
 
@@ -1230,7 +1233,8 @@ const updateStartState = () => {
     });
   const hasVerses = appState.activeVerseIds.length > 0;
   const percentagesValid = validateQuestionTypePercentages();
-  const isDisabled = !anySelected || anyDownloads || !allReady || !hasVerses || !percentagesValid;
+  const blanksValid = validateBlankInputs();
+  const isDisabled = !anySelected || anyDownloads || !allReady || !hasVerses || !percentagesValid || !blanksValid;
 
   startButton.disabled = isDisabled;
 
@@ -1240,6 +1244,8 @@ const updateStartState = () => {
       startButton.setAttribute('aria-label', 'Start quiz - disabled until verses are selected');
     } else if (anyDownloads) {
       startButton.setAttribute('aria-label', 'Start quiz - disabled while downloading verses');
+    } else if (!blanksValid) {
+      startButton.setAttribute('aria-label', 'Start quiz - disabled until blank settings are valid');
     } else if (!percentagesValid) {
       startButton.setAttribute('aria-label', 'Start quiz - disabled until question type percentages total 100%');
     } else {
@@ -3322,48 +3328,98 @@ toggleToChapterLink.addEventListener('click', () => {
   showSelectorView('chapter');
 });
 
-const handleMinBlanksChange = (evt) => {
+const handleMinBlanksChange = () => {
   if (minBlanksInput.value === '') return; // allow clearing before entering a new number
-  const value = Math.max(1, toInt(minBlanksInput.value, 1));
-  appState.minBlanks = value;
-  const hasSelection = appState.activeVerseIds.length > 0;
-  if (hasSelection) {
-    const maxWords = computeMaxWordsInActiveSelection();
-    const percentVal = Math.max(1, Math.min(toInt(appState.maxBlankPercentage, 100), 100));
-    const percentCap = Math.max(1, Math.floor((percentVal / 100) * maxWords));
-    const allowedMax = Math.min(maxWords, percentCap);
-    if (appState.maxBlanks < value) {
-      appState.maxBlanks = Math.min(value, allowedMax);
+  const value = parseInt(minBlanksInput.value, 10);
+  if (!isNaN(value)) {
+    appState.minBlanks = value;
+  }
+
+  // Validate inputs
+  const blanksValid = validateBlankInputs();
+  const percentagesValid = validateQuestionTypePercentages();
+
+  // Update start button disabled state without calling updateStartState
+  // (which would call updateBlankInputs and overwrite user input)
+  const anySelected = appState.activeChapters.length > 0;
+  const anyDownloads = downloadsInFlight.size > 0;
+  const hasVerses = appState.activeVerseIds.length > 0;
+  const allReady =
+    appState.activeChapters.length > 0 &&
+    appState.activeChapters.every((chapterKey) => {
+      const entry = appState.chapterIndex[chapterKey];
+      const selection = appState.verseSelections?.[chapterKey];
+      return entry && isSelectionComplete(selection, entry);
+    });
+
+  const isDisabled = !anySelected || anyDownloads || !allReady || !hasVerses || !percentagesValid || !blanksValid;
+  startButton.disabled = isDisabled;
+
+  // Update aria-label
+  if (isDisabled) {
+    if (!anySelected || !hasVerses) {
+      startButton.setAttribute('aria-label', 'Start quiz - disabled until verses are selected');
+    } else if (anyDownloads) {
+      startButton.setAttribute('aria-label', 'Start quiz - disabled while downloading verses');
+    } else if (!blanksValid) {
+      startButton.setAttribute('aria-label', 'Start quiz - disabled until blank settings are valid');
+    } else if (!percentagesValid) {
+      startButton.setAttribute('aria-label', 'Start quiz - disabled until question type percentages total 100%');
+    } else {
+      startButton.setAttribute('aria-label', 'Start quiz - disabled until all verses are ready');
     }
-  } else if (appState.maxBlanks < value) {
-    appState.maxBlanks = value;
+  } else {
+    startButton.setAttribute('aria-label', 'Start quiz');
   }
-  // Only update UI if this is not an 'input' event (i.e., user is still typing)
-  if (evt.type !== 'input') {
-    updateBlankInputs();
-  }
+
+  saveState();
 };
 
-const handleMaxBlanksChange = (evt) => {
+const handleMaxBlanksChange = () => {
   if (maxBlanksInput.value === '') return; // allow clearing before entering a new number
-  const value = Math.max(1, toInt(maxBlanksInput.value, 1));
-  const hasSelection = appState.activeVerseIds.length > 0;
-  if (hasSelection) {
-    const maxWords = computeMaxWordsInActiveSelection();
-    const percentVal = Math.max(1, Math.min(toInt(appState.maxBlankPercentage, 100), 100));
-    const percentCap = Math.max(1, Math.floor((percentVal / 100) * maxWords));
-    const allowedMax = Math.min(maxWords, percentCap);
-    appState.maxBlanks = Math.min(value, allowedMax);
-  } else {
+  const value = parseInt(maxBlanksInput.value, 10);
+  if (!isNaN(value)) {
     appState.maxBlanks = value;
   }
-  if (appState.maxBlanks < appState.minBlanks) {
-    appState.minBlanks = appState.maxBlanks;
+
+  // Validate inputs
+  const blanksValid = validateBlankInputs();
+  const percentagesValid = validateQuestionTypePercentages();
+
+  // Update start button disabled state without calling updateStartState
+  // (which would call updateBlankInputs and overwrite user input)
+  const anySelected = appState.activeChapters.length > 0;
+  const anyDownloads = downloadsInFlight.size > 0;
+  const hasVerses = appState.activeVerseIds.length > 0;
+  const allReady =
+    appState.activeChapters.length > 0 &&
+    appState.activeChapters.every((chapterKey) => {
+      const entry = appState.chapterIndex[chapterKey];
+      const selection = appState.verseSelections?.[chapterKey];
+      return entry && isSelectionComplete(selection, entry);
+    });
+
+  const isDisabled = !anySelected || anyDownloads || !allReady || !hasVerses || !percentagesValid || !blanksValid;
+  startButton.disabled = isDisabled;
+
+  // Update aria-label
+  if (isDisabled) {
+    if (!anySelected || !hasVerses) {
+      startButton.setAttribute('aria-label', 'Start quiz - disabled until verses are selected');
+    } else if (anyDownloads) {
+      startButton.setAttribute('aria-label', 'Start quiz - disabled while downloading verses');
+    } else if (!blanksValid) {
+      startButton.setAttribute('aria-label', 'Start quiz - disabled until blank settings are valid');
+    } else if (!percentagesValid) {
+      startButton.setAttribute('aria-label', 'Start quiz - disabled until question type percentages total 100%');
+    } else {
+      startButton.setAttribute('aria-label', 'Start quiz - disabled until all verses are ready');
+    }
+  } else {
+    startButton.setAttribute('aria-label', 'Start quiz');
   }
-  // Only update UI if this is not an 'input' event (i.e., user is still typing)
-  if (evt.type !== 'input') {
-    updateBlankInputs();
-  }
+
+  saveState();
 };
 
 const handleMaxPercentChange = (evt) => {
@@ -3374,6 +3430,72 @@ const handleMaxPercentChange = (evt) => {
   if (evt.type !== 'input') {
     updateBlankInputs();
   }
+};
+
+// Validate blank inputs (min/max blanks)
+const validateBlankInputs = () => {
+  // Skip validation if inputs are disabled (e.g., when "use only percentage" is checked)
+  if (minBlanksInput.disabled || maxBlanksInput.disabled) {
+    minBlanksInput.setCustomValidity('');
+    maxBlanksInput.setCustomValidity('');
+    if (minBlanksError) minBlanksError.textContent = '';
+    if (maxBlanksError) maxBlanksError.textContent = '';
+    return true;
+  }
+
+  const minValue = parseInt(minBlanksInput.value, 10);
+  const maxValue = parseInt(maxBlanksInput.value, 10);
+  const hasSelection = appState.activeVerseIds.length > 0;
+
+  let isValid = true;
+
+  // Validate min is at least 1
+  if (isNaN(minValue) || minValue < 1) {
+    minBlanksInput.setCustomValidity('Min blanks must be at least 1');
+    if (minBlanksError) minBlanksError.textContent = 'Min blanks must be at least 1';
+    isValid = false;
+  } else {
+    minBlanksInput.setCustomValidity('');
+    if (minBlanksError) minBlanksError.textContent = '';
+  }
+
+  // Validate max is at least 1
+  if (isNaN(maxValue) || maxValue < 1) {
+    maxBlanksInput.setCustomValidity('Max blanks must be at least 1');
+    if (maxBlanksError) maxBlanksError.textContent = 'Max blanks must be at least 1';
+    isValid = false;
+  } else if (maxValue < minValue) {
+    // Validate max >= min
+    maxBlanksInput.setCustomValidity(`Max blanks (${maxValue}) must be at least Min blanks (${minValue})`);
+    if (maxBlanksError) maxBlanksError.textContent = `Max must be at least ${minValue}`;
+    isValid = false;
+  } else if (hasSelection) {
+    // Validate against allowed max based on verse selection
+    const maxWords = computeMaxWordsInActiveSelection();
+    const percentVal = Math.max(1, Math.min(toInt(appState.maxBlankPercentage, 100), 100));
+    const percentCap = Math.max(1, Math.floor((percentVal / 100) * maxWords));
+    const allowedMax = Math.min(maxWords, percentCap);
+
+    if (maxValue > allowedMax) {
+      maxBlanksInput.setCustomValidity(`Max blanks (${maxValue}) exceeds allowed maximum of ${allowedMax} based on selected verses`);
+      if (maxBlanksError) maxBlanksError.textContent = `Max allowed is ${allowedMax}`;
+      isValid = false;
+    } else {
+      maxBlanksInput.setCustomValidity('');
+      if (maxBlanksError) maxBlanksError.textContent = '';
+    }
+
+    if (minValue > allowedMax) {
+      minBlanksInput.setCustomValidity(`Min blanks (${minValue}) exceeds allowed maximum of ${allowedMax} based on selected verses`);
+      if (minBlanksError) minBlanksError.textContent = `Max allowed is ${allowedMax}`;
+      isValid = false;
+    }
+  } else {
+    maxBlanksInput.setCustomValidity('');
+    if (maxBlanksError) maxBlanksError.textContent = '';
+  }
+
+  return isValid;
 };
 
 // Validate that all question type percentages total 100%
@@ -3444,6 +3566,7 @@ if (typeof window !== 'undefined' && window.__PBE_EXPOSE_TEST_API__) {
     recomputeActiveVerseIds,
     handleMinBlanksChange,
     handleMaxBlanksChange,
+    validateBlankInputs,
     validateQuestionTypePercentages,
     saveState,
     loadState,

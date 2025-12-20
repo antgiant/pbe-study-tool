@@ -248,6 +248,12 @@ input[data-question-type-percentage]:invalid {
   background-color: rgba(248, 113, 113, 0.1);
 }
 
+#min-blanks:invalid,
+#max-blanks:invalid {
+  border-color: #f87171;
+  background-color: rgba(248, 113, 113, 0.1);
+}
+
 .question-card {
   margin-top: 14px;
   border: 1px solid rgba(255, 255, 255, 0.2);

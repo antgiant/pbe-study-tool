@@ -37,9 +37,11 @@
         <fieldset id="blank-selector">
           <legend>Fill in the Blank</legend>
           <label for="min-blanks">Min blanks</label>
-          <input type="number" id="min-blanks" name="min-blanks" min="1" value="1" step="1" inputmode="numeric" />
+          <input type="number" id="min-blanks" name="min-blanks" min="1" value="1" step="1" inputmode="numeric" aria-describedby="min-blanks-error" />
+          <div id="min-blanks-error" aria-live="polite" aria-atomic="true" class="validation-feedback"></div>
           <label for="max-blanks">Max blanks</label>
-          <input type="number" id="max-blanks" name="max-blanks" min="1" value="1" step="1" inputmode="numeric" />
+          <input type="number" id="max-blanks" name="max-blanks" min="1" value="1" step="1" inputmode="numeric" aria-describedby="max-blanks-error" />
+          <div id="max-blanks-error" aria-live="polite" aria-atomic="true" class="validation-feedback"></div>
           <div id="blank-limit" class="hint">Max allowed is 1 based on selected verses.</div>
           <label for="max-blank-percentage">Max percentage blank</label>
           <input type="number" id="max-blank-percentage" name="max-blank-percentage" min="1" max="100" value="100" step="1" inputmode="numeric" />
