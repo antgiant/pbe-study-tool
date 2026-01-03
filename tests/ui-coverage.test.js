@@ -347,6 +347,8 @@ describe('UI coverage flow', () => {
 
     const sorted = testApi.sortVerseIds(['18,1,10', '18,1,2', '18,1,1']);
     expect(sorted[0]).toBe('18,1,1');
+    const multiBookSorted = testApi.sortVerseIds(['19,1,1', '18,2,1', '18,1,1']);
+    expect(multiBookSorted[0]).toBe('18,1,1');
 
     const migrated = testApi.migrateTFIDFData({
       verseBank: {
@@ -368,6 +370,142 @@ describe('UI coverage flow', () => {
     expect(Object.keys(stateWithoutVerses.verseBank).length).toBe(0);
 
     await testApi.requestPersistentStorage();
+
+    testApi.chaptersByYear['dup-year'] = [
+      { bookKey: '18', start: 1, end: 1 },
+      { bookKey: '18', start: 1, end: 1 },
+    ];
+    const deduped = testApi.getSelectionsForYear('dup-year');
+    expect(deduped.length).toBe(1);
+  });
+
+  it('loads persisted state and normalizes chapter statuses', async () => {
+    await testApi.resetDatabase();
+    await testApi.updateSettings({
+      version: 2,
+      year: '2024-2025',
+      activeSelector: 'verse',
+      minBlanks: 2,
+      maxBlanks: 4,
+      maxBlankPercentage: 80,
+      useOnlyPercentage: false,
+      fillInBlankPercentage: 90,
+    });
+    await testApi.updateSelections({
+      activeChapters: ['20,1', '18,1'],
+      verseSelections: {
+        '18,1': { allSelected: true, selectedVerses: [] },
+      },
+    });
+    await testApi.saveChapter({
+      chapterKey: '18,1',
+      bookId: 18,
+      chapter: 1,
+      status: 'error',
+      lastUpdated: '2024-01-01T00:00:00.000Z',
+      verseCount: 1,
+    });
+    await testApi.saveChapter({
+      chapterKey: '20,1',
+      bookId: 20,
+      chapter: 1,
+      status: 'ready',
+      lastUpdated: '2024-01-02T00:00:00.000Z',
+      verseCount: 0,
+    });
+    await testApi.saveVerses([
+      {
+        verseId: '18,1,1',
+        chapterKey: '18,1',
+        bookId: 18,
+        chapter: 1,
+        verse: 1,
+        text: 'In the beginning God created.',
+        source: 'test',
+      },
+    ]);
+
+    const state = await testApi.loadState();
+
+    expect(state.activeChapters).toEqual(['18,1', '20,1']);
+    expect(state.chapterIndex['18,1'].status).toBeUndefined();
+    expect(state.chapterIndex['20,1'].status).toBe('not-downloaded');
+    expect(state.verseBank['18,1,1'].termFrequency).toBeDefined();
+  });
+
+  it('handles rejected persistent storage requests', async () => {
+    Object.defineProperty(global.navigator, 'storage', {
+      value: {
+        persist: vi.fn().mockRejectedValue(new Error('nope')),
+      },
+      configurable: true,
+    });
+
+    await testApi.requestPersistentStorage();
+
+    expect(console.warn).toHaveBeenCalled();
+  });
+
+  it('covers preset utilities and save flows', async () => {
+    await testApi.loadPresetList();
+    const presetOptionsContainer = document.getElementById('preset-options');
+    const newPresetRadio = presetOptionsContainer.querySelector('input[value="__new__"]');
+    newPresetRadio.checked = true;
+    newPresetRadio.dispatchEvent(new Event('change'));
+
+    await testApi.createPreset('Temp Preset');
+    const presetId = testApi.appState.currentPresetId;
+
+    testApi.markPresetModified();
+    testApi.markPresetModified();
+    await testApi.flushPresetAutoSave();
+
+    vi.useFakeTimers();
+    testApi.showPresetSaveStatus('Hold');
+    vi.runAllTimers();
+    vi.useRealTimers();
+
+    await testApi.saveChapterData('18,2', [
+      { verseId: '18,2,1', verse: 1, text: 'Test verse.' },
+    ], 'test');
+
+    await testApi.loadPresetById('missing-preset');
+    await testApi.renamePreset('missing-preset', 'Missing');
+    await testApi.deletePresetById(presetId);
+  });
+
+  it('covers fallback preset drag interactions', async () => {
+    const originalMatchMedia = window.matchMedia;
+    window.matchMedia = vi.fn().mockImplementation(() => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+
+    await testApi.createPreset('Drag A');
+    await testApi.createPreset('Drag B');
+    await testApi.renderPresetList();
+
+    const handles = document.querySelectorAll('.drag-handle');
+    const items = document.querySelectorAll('.preset-list-item');
+    handles[0].setPointerCapture = vi.fn();
+    const originalElementFromPoint = document.elementFromPoint;
+    document.elementFromPoint = vi.fn(() => items[1]);
+
+    const pointerDown = new Event('pointerdown');
+    Object.defineProperty(pointerDown, 'pointerId', { value: 1 });
+    handles[0].dispatchEvent(pointerDown);
+
+    const pointerMove = new Event('pointermove');
+    Object.defineProperty(pointerMove, 'clientX', { value: 10 });
+    Object.defineProperty(pointerMove, 'clientY', { value: 10 });
+    handles[0].dispatchEvent(pointerMove);
+
+    const pointerUp = new Event('pointerup');
+    handles[0].dispatchEvent(pointerUp);
+
+    document.elementFromPoint = originalElementFromPoint;
+    window.matchMedia = originalMatchMedia;
   });
 
 });

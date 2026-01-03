@@ -93,5 +93,10 @@ describe('UI auto init', () => {
     await new Promise((resolve) => setTimeout(resolve, 200));
     expect(window.dbUtils).toBeDefined();
     expect(document.getElementById('year').options.length).toBeGreaterThan(0);
+
+    const version = await window.dbUtils.getVersion();
+    const stores = await window.dbUtils.getStores();
+    expect(version).toBeGreaterThan(0);
+    expect(Array.isArray(stores)).toBe(true);
   });
 });
