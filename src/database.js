@@ -3,12 +3,16 @@
  */
 
 export const DB_NAME = 'PBEDatabase';
-export const DB_VERSION = 3;
+export const DB_VERSION = 4;
 export const STORE_SETTINGS = 'settings';
 export const STORE_SELECTIONS = 'selections';
 export const STORE_CHAPTERS = 'chapters';
 export const STORE_VERSES = 'verses';
 export const STORE_PRESETS = 'presets';
+export const LEGACY_STORE = 'appState';
+export const STATE_KEY = 'currentState';
+export const STORAGE_KEY = 'pbeSettings';
+export const SELECTIONS_KEY = 'pbeSelections';
 export const SETTINGS_KEY = 'userSettings';
 export const SELECTIONS_STORE_KEY = 'currentSelections';
 
@@ -22,45 +26,156 @@ export const openDatabase = () => {
 
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result);
+    request.onblocked = () => {
+      console.warn('Database upgrade blocked - please close all other tabs with this app');
+    };
 
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
+      const oldVersion = event.oldVersion;
 
-      // Settings store - simple key-value
-      if (!db.objectStoreNames.contains(STORE_SETTINGS)) {
-        db.createObjectStore(STORE_SETTINGS);
-      }
+      try {
+        if (oldVersion < 2) {
+          // Settings store - simple key-value
+          if (!db.objectStoreNames.contains(STORE_SETTINGS)) {
+            db.createObjectStore(STORE_SETTINGS);
+          }
 
-      // Selections store - simple key-value
-      if (!db.objectStoreNames.contains(STORE_SELECTIONS)) {
-        db.createObjectStore(STORE_SELECTIONS);
-      }
+          // Selections store - simple key-value
+          if (!db.objectStoreNames.contains(STORE_SELECTIONS)) {
+            db.createObjectStore(STORE_SELECTIONS);
+          }
 
-      // Chapters store - indexed by chapterKey
-      if (!db.objectStoreNames.contains(STORE_CHAPTERS)) {
-        const chapterStore = db.createObjectStore(STORE_CHAPTERS, { keyPath: 'chapterKey' });
-        chapterStore.createIndex('bookId', 'bookId', { unique: false });
-        chapterStore.createIndex('status', 'status', { unique: false });
-        chapterStore.createIndex('lastUpdated', 'lastUpdated', { unique: false });
-      }
+          // Chapters store - indexed by chapterKey
+          if (!db.objectStoreNames.contains(STORE_CHAPTERS)) {
+            const chapterStore = db.createObjectStore(STORE_CHAPTERS, { keyPath: 'chapterKey' });
+            chapterStore.createIndex('bookId', 'bookId', { unique: false });
+            chapterStore.createIndex('status', 'status', { unique: false });
+            chapterStore.createIndex('lastUpdated', 'lastUpdated', { unique: false });
+          }
 
-      // Verses store - indexed by verseId
-      if (!db.objectStoreNames.contains(STORE_VERSES)) {
-        const verseStore = db.createObjectStore(STORE_VERSES, { keyPath: 'verseId' });
-        verseStore.createIndex('chapterKey', 'chapterKey', { unique: false });
-        verseStore.createIndex('bookId', 'bookId', { unique: false });
-        verseStore.createIndex('bookChapter', ['bookId', 'chapter'], { unique: false });
-      }
+          // Verses store - indexed by verseId
+          if (!db.objectStoreNames.contains(STORE_VERSES)) {
+            const verseStore = db.createObjectStore(STORE_VERSES, { keyPath: 'verseId' });
+            verseStore.createIndex('chapterKey', 'chapterKey', { unique: false });
+            verseStore.createIndex('bookId', 'bookId', { unique: false });
+            verseStore.createIndex('bookChapter', ['bookId', 'chapter'], { unique: false });
+          }
+        }
 
-      // Presets store - indexed by ID
-      if (!db.objectStoreNames.contains(STORE_PRESETS)) {
-        const presetStore = db.createObjectStore(STORE_PRESETS, { keyPath: 'id' });
-        presetStore.createIndex('name', 'name', { unique: true });
-        presetStore.createIndex('lastModified', 'lastModified', { unique: false });
-        presetStore.createIndex('createdAt', 'createdAt', { unique: false });
+        if (oldVersion < 4) {
+          if (!db.objectStoreNames.contains(STORE_PRESETS)) {
+            const presetStore = db.createObjectStore(STORE_PRESETS, { keyPath: 'id' });
+            presetStore.createIndex('name', 'name', { unique: true });
+            presetStore.createIndex('lastModified', 'lastModified', { unique: false });
+            presetStore.createIndex('createdAt', 'createdAt', { unique: false });
+          }
+        }
+      } catch (error) {
+        console.error('Error during database upgrade:', error);
+        throw error;
       }
     };
   });
+};
+
+export const checkDatabaseHealth = async () => {
+  try {
+    const db = await openDatabase();
+    const stores = Array.from(db.objectStoreNames);
+    db.close();
+
+    const expectedStores = [STORE_SETTINGS, STORE_SELECTIONS, STORE_CHAPTERS, STORE_VERSES, STORE_PRESETS];
+    const missingStores = expectedStores.filter(store => !stores.includes(store));
+
+    if (missingStores.length > 0) {
+      console.error('Database health check failed - missing stores:', missingStores);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Database health check error:', error);
+    return false;
+  }
+};
+
+export const resetDatabase = async () => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(DB_NAME);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+    request.onblocked = () => {
+      console.warn('Database deletion blocked - please close all other tabs');
+    };
+  });
+};
+
+export const getFromIndexedDB = async (key) => {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([LEGACY_STORE], 'readonly');
+      const store = transaction.objectStore(LEGACY_STORE);
+      const request = store.get(key);
+
+      request.onsuccess = () => {
+        db.close();
+        resolve(request.result);
+      };
+      request.onerror = () => {
+        db.close();
+        reject(request.error);
+      };
+    });
+  } catch (err) {
+    console.warn('IndexedDB get error:', err);
+    return null;
+  }
+};
+
+export const setToIndexedDB = async (key, value) => {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([LEGACY_STORE], 'readwrite');
+      const store = transaction.objectStore(LEGACY_STORE);
+      const request = store.put(value, key);
+
+      request.onsuccess = () => {
+        db.close();
+        resolve();
+      };
+      request.onerror = () => {
+        db.close();
+        reject(request.error);
+      };
+    });
+  } catch (err) {
+    console.warn('IndexedDB set error:', err);
+    throw err;
+  }
+};
+
+export const migrateFromLocalStorage = async () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    console.log('Migrating data from localStorage to IndexedDB...');
+
+    await setToIndexedDB(STATE_KEY, parsed);
+
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(SELECTIONS_KEY);
+
+    console.log('Migration complete!');
+    return parsed;
+  } catch (err) {
+    console.warn('Migration from localStorage failed:', err);
+    return null;
+  }
 };
 
 /**
@@ -334,6 +449,31 @@ export const getVersesByChapter = async (chapterKey) => {
   }
 };
 
+export const getVersesByChapters = async (chapterKeys) => {
+  try {
+    const db = await openDatabase();
+    const allVerses = [];
+
+    for (const chapterKey of chapterKeys) {
+      const verses = await new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_VERSES], 'readonly');
+        const store = transaction.objectStore(STORE_VERSES);
+        const index = store.index('chapterKey');
+        const request = index.getAll(chapterKey);
+        request.onsuccess = () => resolve(request.result || []);
+        request.onerror = () => reject(request.error);
+      });
+      allVerses.push(...verses);
+    }
+
+    db.close();
+    return allVerses;
+  } catch (err) {
+    console.warn('Error getting verses by chapters:', err);
+    return [];
+  }
+};
+
 /**
  * Saves a verse to database
  * @param {Object} verse - Verse data
@@ -577,5 +717,110 @@ export const deletePreset = async (id) => {
   } catch (err) {
     console.warn('Error deleting preset:', err);
     throw err;
+  }
+};
+
+export const migrateToOptimizedSchema = async (oldState, options = {}) => {
+  const stateVersion = options.stateVersion ?? oldState?.version ?? 1;
+  const statusNotDownloaded = options.statusNotDownloaded ?? 'not-downloaded';
+
+  console.log('Starting migration to optimized IndexedDB schema...');
+
+  try {
+    const settings = {
+      version: stateVersion,
+      year: oldState.year || '',
+      activeSelector: oldState.activeSelector || 'chapter',
+      minBlanks: oldState.minBlanks || 1,
+      maxBlanks: oldState.maxBlanks || 1,
+      maxBlankPercentage: oldState.maxBlankPercentage || 100,
+      useOnlyPercentage: oldState.useOnlyPercentage || false,
+      fillInBlankPercentage: oldState.fillInBlankPercentage || 100,
+      lastUpdated: new Date().toISOString(),
+    };
+    await updateSettings(settings);
+    console.log('✓ Settings migrated');
+
+    const selections = {
+      activeChapters: oldState.activeChapters || [],
+      verseSelections: oldState.verseSelections || {},
+    };
+    await updateSelections(selections);
+    console.log('✓ Selections migrated');
+
+    const chapters = Object.entries(oldState.chapterIndex || {}).map(([key, data]) => {
+      const [bookId, chapter] = key.split(',').map(Number);
+      return {
+        chapterKey: key,
+        bookId,
+        chapter,
+        status: data.status || statusNotDownloaded,
+        lastUpdated: data.lastUpdated || new Date().toISOString(),
+        verseCount: data.verseIds?.length || 0,
+      };
+    });
+
+    for (const chapter of chapters) {
+      await saveChapter(chapter);
+    }
+    console.log(`✓ ${chapters.length} chapters migrated`);
+
+    const verses = Object.entries(oldState.verseBank || {}).map(([id, verse]) => ({
+      verseId: id,
+      chapterKey: `${verse.bookId},${verse.chapter}`,
+      bookId: verse.bookId,
+      chapter: verse.chapter,
+      verse: verse.verse,
+      text: verse.text,
+      source: verse.source,
+      downloadedAt: new Date().toISOString(),
+    }));
+
+    await saveVerses(verses);
+    console.log(`✓ ${verses.length} verses migrated`);
+
+    const db = await openDatabase();
+    if (db.objectStoreNames.contains(LEGACY_STORE)) {
+      await new Promise((resolve, reject) => {
+        const transaction = db.transaction([LEGACY_STORE], 'readwrite');
+        const store = transaction.objectStore(LEGACY_STORE);
+        const request = store.delete(STATE_KEY);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+    }
+    db.close();
+
+    console.log('✓ Migration to optimized schema complete!');
+    return true;
+  } catch (err) {
+    console.error('Migration to optimized schema failed:', err);
+    throw err;
+  }
+};
+
+export const checkAndMigrateSchema = async (options = {}) => {
+  try {
+    const settings = await getSettings();
+    if (settings) {
+      return false;
+    }
+
+    const oldData = await getFromIndexedDB(STATE_KEY);
+    if (oldData) {
+      await migrateToOptimizedSchema(oldData, options);
+      return true;
+    }
+
+    const localStorageData = await migrateFromLocalStorage();
+    if (localStorageData) {
+      await migrateToOptimizedSchema(localStorageData, options);
+      return true;
+    }
+
+    return false;
+  } catch (err) {
+    console.warn('Schema migration check failed:', err);
+    return false;
   }
 };
