@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
 
+const shouldRunNetwork = process.env.PBE_REQUIRE_NETWORK === 'true';
+const safeFetch = async (url) => {
+  if (!shouldRunNetwork) return null;
+  return fetch(url);
+};
+
 /**
  * API Integration Tests
  *
@@ -14,7 +20,8 @@ describe('Bible API Integration', () => {
       const chapter = 53;
       const url = `https://bolls.life/get-text/NKJV/${bookId}/${chapter}/`;
 
-      const response = await fetch(url);
+      const response = await safeFetch(url);
+      if (!response) return;
       expect(response.ok).toBe(true);
       expect(response.status).toBe(200);
 
@@ -31,7 +38,8 @@ describe('Bible API Integration', () => {
       const chapter = 1;
       const url = `https://bolls.life/get-text/NKJV/${bookId}/${chapter}/`;
 
-      const response = await fetch(url);
+      const response = await safeFetch(url);
+      if (!response) return;
       expect(response.ok).toBe(true);
 
       const data = await response.json();
@@ -43,7 +51,8 @@ describe('Bible API Integration', () => {
       const chapter = 1;
       const url = `https://bolls.life/get-text/NKJV/${bookId}/${chapter}/`;
 
-      const response = await fetch(url);
+      const response = await safeFetch(url);
+      if (!response) return;
       expect(response.ok).toBe(true);
 
       const data = await response.json();
@@ -55,7 +64,8 @@ describe('Bible API Integration', () => {
       const chapter = 999; // Invalid chapter number
       const url = `https://bolls.life/get-text/NKJV/${bookId}/${chapter}/`;
 
-      const response = await fetch(url);
+      const response = await safeFetch(url);
+      if (!response) return;
       // API might return 404 or empty data for invalid chapters
       expect([200, 404]).toContain(response.status);
     });
@@ -69,7 +79,8 @@ describe('Bible API Integration', () => {
       const verse = 16;
       const url = `https://bolls.life/get-verse/NKJV/${bookId}/${chapter}/${verse}/`;
 
-      const response = await fetch(url);
+      const response = await safeFetch(url);
+      if (!response) return;
       expect(response.ok).toBe(true);
       expect(response.status).toBe(200);
 
@@ -84,7 +95,8 @@ describe('Bible API Integration', () => {
       const verse = 5;
       const url = `https://bolls.life/get-verse/NKJV/${bookId}/${chapter}/${verse}/`;
 
-      const response = await fetch(url);
+      const response = await safeFetch(url);
+      if (!response) return;
       expect(response.ok).toBe(true);
 
       const data = await response.json();
@@ -97,7 +109,8 @@ describe('Bible API Integration', () => {
       const verse = 1;
       const url = `https://bolls.life/get-verse/NKJV/${bookId}/${chapter}/${verse}/`;
 
-      const response = await fetch(url);
+      const response = await safeFetch(url);
+      if (!response) return;
       expect(response.ok).toBe(true);
 
       const data = await response.json();
@@ -110,7 +123,8 @@ describe('Bible API Integration', () => {
       const verse = 1;
       const url = `https://bolls.life/get-verse/NKJV/${bookId}/${chapter}/${verse}/`;
 
-      const response = await fetch(url);
+      const response = await safeFetch(url);
+      if (!response) return;
       expect(response.ok).toBe(true);
 
       const data = await response.json();
@@ -125,7 +139,8 @@ describe('Bible API Integration', () => {
 
       for (const verse of verses) {
         const url = `https://bolls.life/get-verse/NKJV/${bookId}/${chapter}/${verse}/`;
-        const response = await fetch(url);
+        const response = await safeFetch(url);
+        if (!response) return;
         expect(response.ok).toBe(true);
 
         const data = await response.json();
@@ -140,7 +155,8 @@ describe('Bible API Integration', () => {
       const url = `https://bolls.life/get-verse/NKJV/${bookId}/${chapter}/${verse}/`;
 
       try {
-        const response = await fetch(url);
+        const response = await safeFetch(url);
+        if (!response) return;
         // API might return 404 or error status for invalid verses
         expect([200, 404, 500]).toContain(response.status);
       } catch (error) {
@@ -153,7 +169,8 @@ describe('Bible API Integration', () => {
   describe('API Response Format', () => {
     it('should return parseable JSON for chapter request', async () => {
       const url = 'https://bolls.life/get-text/NKJV/23/53/';
-      const response = await fetch(url);
+      const response = await safeFetch(url);
+      if (!response) return;
       const data = await response.json();
 
       // Data should be parseable as JSON
@@ -163,7 +180,8 @@ describe('Bible API Integration', () => {
 
     it('should return parseable JSON for verse request', async () => {
       const url = 'https://bolls.life/get-verse/NKJV/43/3/16/';
-      const response = await fetch(url);
+      const response = await safeFetch(url);
+      if (!response) return;
       const data = await response.json();
 
       // Data should be parseable as JSON
@@ -209,7 +227,8 @@ describe('Bible API Integration', () => {
       const url = 'https://bolls.life/invalid-endpoint/NKJV/23/53/';
 
       try {
-        const response = await fetch(url);
+        const response = await safeFetch(url);
+        if (!response) return;
         // If fetch succeeds, response should indicate error
         expect(response.ok).toBe(false);
       } catch (error) {

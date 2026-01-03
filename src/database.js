@@ -3,11 +3,12 @@
  */
 
 export const DB_NAME = 'PBEDatabase';
-export const DB_VERSION = 2;
+export const DB_VERSION = 3;
 export const STORE_SETTINGS = 'settings';
 export const STORE_SELECTIONS = 'selections';
 export const STORE_CHAPTERS = 'chapters';
 export const STORE_VERSES = 'verses';
+export const STORE_PRESETS = 'presets';
 export const SETTINGS_KEY = 'userSettings';
 export const SELECTIONS_STORE_KEY = 'currentSelections';
 
@@ -49,6 +50,14 @@ export const openDatabase = () => {
         verseStore.createIndex('chapterKey', 'chapterKey', { unique: false });
         verseStore.createIndex('bookId', 'bookId', { unique: false });
         verseStore.createIndex('bookChapter', ['bookId', 'chapter'], { unique: false });
+      }
+
+      // Presets store - indexed by ID
+      if (!db.objectStoreNames.contains(STORE_PRESETS)) {
+        const presetStore = db.createObjectStore(STORE_PRESETS, { keyPath: 'id' });
+        presetStore.createIndex('name', 'name', { unique: true });
+        presetStore.createIndex('lastModified', 'lastModified', { unique: false });
+        presetStore.createIndex('createdAt', 'createdAt', { unique: false });
       }
     };
   });
@@ -425,6 +434,148 @@ export const deleteVersesByChapter = async (chapterKey) => {
     });
   } catch (err) {
     console.warn('Error deleting verses by chapter:', err);
+    throw err;
+  }
+};
+
+/**
+ * Gets all presets sorted by last modified
+ * @returns {Promise<Array>} Array of presets
+ */
+export const getAllPresets = async () => {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_PRESETS], 'readonly');
+      const store = transaction.objectStore(STORE_PRESETS);
+      const request = store.getAll();
+      request.onsuccess = () => {
+        db.close();
+        const presets = request.result || [];
+        // Sort by explicit order or createdAt ascending
+        presets.sort((a, b) => {
+          const aOrder = Number.isFinite(a.order) ? a.order : new Date(a.createdAt || 0).getTime();
+          const bOrder = Number.isFinite(b.order) ? b.order : new Date(b.createdAt || 0).getTime();
+          return aOrder - bOrder;
+        });
+        resolve(presets);
+      };
+      request.onerror = () => {
+        db.close();
+        reject(request.error);
+      };
+    });
+  } catch (err) {
+    console.warn('Error getting all presets:', err);
+    return [];
+  }
+};
+
+/**
+ * Gets a single preset by ID
+ * @param {string} id - Preset ID
+ * @returns {Promise<Object|null>} Preset or null
+ */
+export const getPreset = async (id) => {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_PRESETS], 'readonly');
+      const store = transaction.objectStore(STORE_PRESETS);
+      const request = store.get(id);
+      request.onsuccess = () => {
+        db.close();
+        resolve(request.result || null);
+      };
+      request.onerror = () => {
+        db.close();
+        reject(request.error);
+      };
+    });
+  } catch (err) {
+    console.warn('Error getting preset:', err);
+    return null;
+  }
+};
+
+/**
+ * Gets a preset by name
+ * @param {string} name - Preset name
+ * @returns {Promise<Object|null>} Preset or null
+ */
+export const getPresetByName = async (name) => {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_PRESETS], 'readonly');
+      const store = transaction.objectStore(STORE_PRESETS);
+      const index = store.index('name');
+      const request = index.get(name);
+      request.onsuccess = () => {
+        db.close();
+        resolve(request.result || null);
+      };
+      request.onerror = () => {
+        db.close();
+        reject(request.error);
+      };
+    });
+  } catch (err) {
+    console.warn('Error getting preset by name:', err);
+    return null;
+  }
+};
+
+/**
+ * Saves or updates a preset
+ * @param {Object} preset - Preset data
+ * @returns {Promise<void>}
+ */
+export const savePreset = async (preset) => {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_PRESETS], 'readwrite');
+      const store = transaction.objectStore(STORE_PRESETS);
+      const request = store.put(preset);
+      request.onsuccess = () => {
+        db.close();
+        resolve();
+      };
+      request.onerror = () => {
+        db.close();
+        reject(request.error);
+      };
+    });
+  } catch (err) {
+    console.warn('Error saving preset:', err);
+    throw err;
+  }
+};
+
+/**
+ * Deletes a preset
+ * @param {string} id - Preset ID
+ * @returns {Promise<void>}
+ */
+export const deletePreset = async (id) => {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_PRESETS], 'readwrite');
+      const store = transaction.objectStore(STORE_PRESETS);
+      const request = store.delete(id);
+      request.onsuccess = () => {
+        db.close();
+        resolve();
+      };
+      request.onerror = () => {
+        db.close();
+        reject(request.error);
+      };
+    });
+  } catch (err) {
+    console.warn('Error deleting preset:', err);
     throw err;
   }
 };

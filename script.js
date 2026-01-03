@@ -36,6 +36,18 @@ const minBlanksLabel = document.querySelector('label[for="min-blanks"]');
 const maxBlanksLabel = document.querySelector('label[for="max-blanks"]');
 const fillInBlankPercentageInput = document.getElementById('fill-in-blank-percentage');
 const questionTypeTotalValue = document.getElementById('question-type-total-value');
+const presetOptionsContainer = document.getElementById('preset-options');
+const presetManageButton = document.getElementById('preset-manage-button');
+const presetSaveStatus = document.getElementById('preset-save-status');
+const presetModal = document.getElementById('preset-modal');
+const presetModalClose = document.getElementById('preset-modal-close');
+const presetListContainer = document.getElementById('preset-list-container');
+const presetNameModal = document.getElementById('preset-name-modal');
+const presetNameModalClose = document.getElementById('preset-name-modal-close');
+const presetNameInput = document.getElementById('preset-name-input');
+const presetNameSave = document.getElementById('preset-name-save');
+const presetNameCancel = document.getElementById('preset-name-cancel');
+const presetNameError = document.getElementById('preset-name-error');
 
 const STORAGE_KEY = 'pbeSettings';
 const SELECTIONS_KEY = 'pbeSelections';
@@ -60,11 +72,12 @@ let storageWritable = true;
 
 // IndexedDB Configuration
 const DB_NAME = 'PBEDatabase';
-const DB_VERSION = 2; // Incremented for schema change
+const DB_VERSION = 4; // Incremented to fix missing presets store
 const STORE_SETTINGS = 'settings';
 const STORE_SELECTIONS = 'selections';
 const STORE_CHAPTERS = 'chapters';
 const STORE_VERSES = 'verses';
+const STORE_PRESETS = 'presets';
 const LEGACY_STORE = 'appState'; // Old store for migration
 const STATE_KEY = 'currentState'; // Legacy key
 const SETTINGS_KEY = 'userSettings';
@@ -75,45 +88,103 @@ const openDatabase = () => {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => {
+      console.error('Database open error:', request.error);
+      reject(request.error);
+    };
+
+    request.onsuccess = () => {
+      resolve(request.result);
+    };
+
+    request.onblocked = () => {
+      console.warn('Database upgrade blocked - please close all other tabs with this app');
+    };
 
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
       const oldVersion = event.oldVersion;
 
-      // Migration from version 1 to version 2
-      if (oldVersion < 2) {
-        // Create new object stores
+      try {
+        // Migration from version 1 to version 2
+        if (oldVersion < 2) {
+          // Settings store - simple key-value
+          if (!db.objectStoreNames.contains(STORE_SETTINGS)) {
+            db.createObjectStore(STORE_SETTINGS);
+          }
 
-        // Settings store - simple key-value
-        if (!db.objectStoreNames.contains(STORE_SETTINGS)) {
-          db.createObjectStore(STORE_SETTINGS);
+          // Selections store - simple key-value
+          if (!db.objectStoreNames.contains(STORE_SELECTIONS)) {
+            db.createObjectStore(STORE_SELECTIONS);
+          }
+
+          // Chapters store - indexed by chapterKey
+          if (!db.objectStoreNames.contains(STORE_CHAPTERS)) {
+            const chapterStore = db.createObjectStore(STORE_CHAPTERS, { keyPath: 'chapterKey' });
+            chapterStore.createIndex('bookId', 'bookId', { unique: false });
+            chapterStore.createIndex('status', 'status', { unique: false });
+            chapterStore.createIndex('lastUpdated', 'lastUpdated', { unique: false });
+          }
+
+          // Verses store - indexed by verseId
+          if (!db.objectStoreNames.contains(STORE_VERSES)) {
+            const verseStore = db.createObjectStore(STORE_VERSES, { keyPath: 'verseId' });
+            verseStore.createIndex('chapterKey', 'chapterKey', { unique: false });
+            verseStore.createIndex('bookId', 'bookId', { unique: false });
+            verseStore.createIndex('bookChapter', ['bookId', 'chapter'], { unique: false });
+          }
+
+          // Keep legacy store for migration, will be deleted after migration completes
         }
 
-        // Selections store - simple key-value
-        if (!db.objectStoreNames.contains(STORE_SELECTIONS)) {
-          db.createObjectStore(STORE_SELECTIONS);
+        // Migration from version 2 to version 3 - add presets store
+        // Migration from version 3 to version 4 - ensure presets store exists (fixes incomplete v3 upgrade)
+        if (oldVersion < 4) {
+          if (!db.objectStoreNames.contains(STORE_PRESETS)) {
+            const presetStore = db.createObjectStore(STORE_PRESETS, { keyPath: 'id' });
+            presetStore.createIndex('name', 'name', { unique: true });
+            presetStore.createIndex('lastModified', 'lastModified', { unique: false });
+            presetStore.createIndex('createdAt', 'createdAt', { unique: false });
+          }
         }
-
-        // Chapters store - indexed by chapterKey
-        if (!db.objectStoreNames.contains(STORE_CHAPTERS)) {
-          const chapterStore = db.createObjectStore(STORE_CHAPTERS, { keyPath: 'chapterKey' });
-          chapterStore.createIndex('bookId', 'bookId', { unique: false });
-          chapterStore.createIndex('status', 'status', { unique: false });
-          chapterStore.createIndex('lastUpdated', 'lastUpdated', { unique: false });
-        }
-
-        // Verses store - indexed by verseId
-        if (!db.objectStoreNames.contains(STORE_VERSES)) {
-          const verseStore = db.createObjectStore(STORE_VERSES, { keyPath: 'verseId' });
-          verseStore.createIndex('chapterKey', 'chapterKey', { unique: false });
-          verseStore.createIndex('bookId', 'bookId', { unique: false });
-          verseStore.createIndex('bookChapter', ['bookId', 'chapter'], { unique: false });
-        }
-
-        // Keep legacy store for migration, will be deleted after migration completes
+      } catch (error) {
+        console.error('Error during database upgrade:', error);
+        throw error;
       }
+    };
+  });
+};
+
+// Utility function to check and fix database issues
+const checkDatabaseHealth = async () => {
+  try {
+    const db = await openDatabase();
+    const stores = Array.from(db.objectStoreNames);
+    db.close();
+
+    const expectedStores = [STORE_SETTINGS, STORE_SELECTIONS, STORE_CHAPTERS, STORE_VERSES, STORE_PRESETS];
+    const missingStores = expectedStores.filter(store => !stores.includes(store));
+
+    if (missingStores.length > 0) {
+      console.error('Database health check failed - missing stores:', missingStores);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Database health check error:', error);
+    return false;
+  }
+};
+
+// Force database recreation (WARNING: deletes all data)
+const resetDatabase = async () => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(DB_NAME);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+    request.onblocked = () => {
+      console.warn('Database deletion blocked - please close all other tabs');
     };
   });
 };
@@ -436,6 +507,163 @@ const deleteVersesByChapter = async (chapterKey) => {
   }
 };
 
+// Presets API
+const getAllPresets = async () => {
+  try {
+    const db = await openDatabase();
+
+    // Check if the presets store exists
+    if (!db.objectStoreNames.contains(STORE_PRESETS)) {
+      db.close();
+      console.warn('Presets store not found, database may need upgrade');
+      return [];
+    }
+
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_PRESETS], 'readonly');
+      const store = transaction.objectStore(STORE_PRESETS);
+      const request = store.getAll();
+      request.onsuccess = () => {
+        db.close();
+        const presets = request.result || [];
+        // Sort by explicit order or createdAt ascending
+        presets.sort((a, b) => {
+          const aOrder = Number.isFinite(a.order) ? a.order : new Date(a.createdAt || 0).getTime();
+          const bOrder = Number.isFinite(b.order) ? b.order : new Date(b.createdAt || 0).getTime();
+          return aOrder - bOrder;
+        });
+        resolve(presets);
+      };
+      request.onerror = () => {
+        db.close();
+        reject(request.error);
+      };
+    });
+  } catch (err) {
+    console.warn('Error getting all presets:', err);
+    return [];
+  }
+};
+
+const getPreset = async (id) => {
+  try {
+    const db = await openDatabase();
+
+    // Check if the presets store exists
+    if (!db.objectStoreNames.contains(STORE_PRESETS)) {
+      db.close();
+      console.warn('Presets store not found, database may need upgrade');
+      return null;
+    }
+
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_PRESETS], 'readonly');
+      const store = transaction.objectStore(STORE_PRESETS);
+      const request = store.get(id);
+      request.onsuccess = () => {
+        db.close();
+        resolve(request.result || null);
+      };
+      request.onerror = () => {
+        db.close();
+        reject(request.error);
+      };
+    });
+  } catch (err) {
+    console.warn('Error getting preset:', err);
+    return null;
+  }
+};
+
+const getPresetByName = async (name) => {
+  try {
+    const db = await openDatabase();
+
+    // Check if the presets store exists
+    if (!db.objectStoreNames.contains(STORE_PRESETS)) {
+      db.close();
+      console.warn('Presets store not found, database may need upgrade');
+      return null;
+    }
+
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_PRESETS], 'readonly');
+      const store = transaction.objectStore(STORE_PRESETS);
+      const index = store.index('name');
+      const request = index.get(name);
+      request.onsuccess = () => {
+        db.close();
+        resolve(request.result || null);
+      };
+      request.onerror = () => {
+        db.close();
+        reject(request.error);
+      };
+    });
+  } catch (err) {
+    console.warn('Error getting preset by name:', err);
+    return null;
+  }
+};
+
+const savePreset = async (preset) => {
+  try {
+    const db = await openDatabase();
+
+    // Check if the presets store exists
+    if (!db.objectStoreNames.contains(STORE_PRESETS)) {
+      db.close();
+      throw new Error('Presets store not found, database may need upgrade');
+    }
+
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_PRESETS], 'readwrite');
+      const store = transaction.objectStore(STORE_PRESETS);
+      const request = store.put(preset);
+      request.onsuccess = () => {
+        db.close();
+        resolve();
+      };
+      request.onerror = () => {
+        db.close();
+        reject(request.error);
+      };
+    });
+  } catch (err) {
+    console.warn('Error saving preset:', err);
+    throw err;
+  }
+};
+
+const deletePreset = async (id) => {
+  try {
+    const db = await openDatabase();
+
+    // Check if the presets store exists
+    if (!db.objectStoreNames.contains(STORE_PRESETS)) {
+      db.close();
+      throw new Error('Presets store not found, database may need upgrade');
+    }
+
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_PRESETS], 'readwrite');
+      const store = transaction.objectStore(STORE_PRESETS);
+      const request = store.delete(id);
+      request.onsuccess = () => {
+        db.close();
+        resolve();
+      };
+      request.onerror = () => {
+        db.close();
+        reject(request.error);
+      };
+    });
+  } catch (err) {
+    console.warn('Error deleting preset:', err);
+    throw err;
+  }
+};
+
 // Big Bang Migration from Old Schema to New Schema
 const migrateToOptimizedSchema = async (oldState) => {
   console.log('Starting migration to optimized IndexedDB schema...');
@@ -752,6 +980,8 @@ const defaultState = {
   maxBlankPercentage: 100,
   useOnlyPercentage: false,
   fillInBlankPercentage: 100,
+  currentPresetId: null,
+  presetModified: false,
 };
 
 let appState = { ...defaultState };
@@ -1009,6 +1239,549 @@ const recomputeActiveVerseIds = () => {
   });
   appState.activeVerseIds = ids;
 };
+
+// Preset Management Functions
+function generatePresetId() {
+  return `preset-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+function getCurrentPresetState() {
+  return {
+    year: appState.year,
+    activeChapters: [...appState.activeChapters],
+    verseSelections: JSON.parse(JSON.stringify(appState.verseSelections)),
+    activeSelector: appState.activeSelector,
+    minBlanks: appState.minBlanks,
+    maxBlanks: appState.maxBlanks,
+    maxBlankPercentage: appState.maxBlankPercentage,
+    useOnlyPercentage: appState.useOnlyPercentage,
+    fillInBlankPercentage: appState.fillInBlankPercentage
+  };
+}
+
+async function applyPresetState(presetData) {
+  // Update state
+  appState.year = presetData.year;
+  appState.activeChapters = [...presetData.activeChapters];
+  appState.verseSelections = JSON.parse(JSON.stringify(presetData.verseSelections));
+  appState.activeSelector = presetData.activeSelector;
+  appState.minBlanks = presetData.minBlanks;
+  appState.maxBlanks = presetData.maxBlanks;
+  appState.maxBlankPercentage = presetData.maxBlankPercentage;
+  appState.useOnlyPercentage = presetData.useOnlyPercentage;
+  appState.fillInBlankPercentage = presetData.fillInBlankPercentage;
+
+  // Update UI
+  seasonSelect.value = presetData.year;
+  minBlanksInput.value = presetData.minBlanks;
+  maxBlanksInput.value = presetData.maxBlanks;
+  maxBlankPercentageInput.value = presetData.maxBlankPercentage;
+  useOnlyPercentageInput.checked = presetData.useOnlyPercentage;
+  fillInBlankPercentageInput.value = presetData.fillInBlankPercentage;
+
+  // Apply year exclusions and render selections
+  applyYearExclusions(presetData.year);
+
+  const selectedValues = new Set(appState.activeChapters || []);
+
+  // Show correct selector
+  if (presetData.activeSelector === 'verse') {
+    chapterSelector.style.display = 'none';
+    verseSelector.style.display = 'block';
+    await renderVerseOptions(presetData.year, selectedValues);
+  } else {
+    chapterSelector.style.display = 'block';
+    verseSelector.style.display = 'none';
+    renderChapterOptions(presetData.year, selectedValues);
+  }
+
+  // Recompute active verses
+  recomputeActiveVerseIds();
+
+  // Save state
+  await saveState();
+}
+
+let presetAutoSaveTimer = null;
+let presetAutoSavePromise = null;
+let presetSaveStatusTimer = null;
+const PRESET_AUTOSAVE_DELAY = 500;
+let presetNameMode = 'create';
+let presetNameTargetId = null;
+let presetListCache = [];
+let presetDragState = null;
+
+const getNativeDndSupport = () => {
+  if (typeof window === 'undefined') return false;
+  const supportsDrag = 'draggable' in document.createElement('div');
+  const prefersFinePointer = window.matchMedia?.('(pointer: fine)')?.matches ?? true;
+  return supportsDrag && prefersFinePointer;
+};
+
+const reorderPresets = async (draggedId, targetId) => {
+  if (!draggedId || !targetId || draggedId === targetId) return;
+
+  const fromIndex = presetListCache.findIndex(p => p.id === draggedId);
+  const toIndex = presetListCache.findIndex(p => p.id === targetId);
+  if (fromIndex === -1 || toIndex === -1) return;
+
+  const reordered = [...presetListCache];
+  const [moved] = reordered.splice(fromIndex, 1);
+  reordered.splice(toIndex, 0, moved);
+
+  await Promise.all(
+    reordered.map((preset, index) => savePreset({
+      ...preset,
+      order: index
+    }))
+  );
+
+  presetListCache = reordered;
+  await loadPresetList();
+  await renderPresetList();
+  showPresetSaveStatus('Reordered');
+};
+
+function showPresetSaveStatus(message = 'Saved') {
+  if (!presetSaveStatus) return;
+  presetSaveStatus.textContent = message;
+  presetSaveStatus.style.display = 'block';
+  if (presetSaveStatusTimer) {
+    clearTimeout(presetSaveStatusTimer);
+  }
+  presetSaveStatusTimer = setTimeout(() => {
+    presetSaveStatus.style.display = 'none';
+  }, 1500);
+}
+
+async function saveCurrentPreset() {
+  if (!appState.currentPresetId) return;
+
+  try {
+    const existing = await getPreset(appState.currentPresetId);
+    if (!existing) return;
+
+    const preset = {
+      ...existing,
+      lastModified: new Date().toISOString(),
+      ...getCurrentPresetState()
+    };
+
+    await savePreset(preset);
+    appState.presetModified = false;
+    showPresetSaveStatus();
+  } catch (err) {
+    console.error('Error auto-saving preset:', err);
+  }
+}
+
+async function flushPresetAutoSave() {
+  if (presetAutoSaveTimer) {
+    clearTimeout(presetAutoSaveTimer);
+    presetAutoSaveTimer = null;
+    await saveCurrentPreset();
+    return;
+  }
+  if (presetAutoSavePromise) {
+    await presetAutoSavePromise;
+  }
+}
+
+function markPresetModified() {
+  if (!appState.currentPresetId) return;
+  appState.presetModified = true;
+  if (presetAutoSaveTimer) {
+    clearTimeout(presetAutoSaveTimer);
+  }
+  presetAutoSaveTimer = setTimeout(() => {
+    presetAutoSaveTimer = null;
+    presetAutoSavePromise = saveCurrentPreset().finally(() => {
+      presetAutoSavePromise = null;
+    });
+  }, PRESET_AUTOSAVE_DELAY);
+}
+
+function setSelectedPreset(presetId) {
+  const presetRadios = presetOptionsContainer.querySelectorAll('.preset-option');
+  presetRadios.forEach(radio => {
+    radio.checked = radio.value === presetId;
+  });
+}
+
+async function loadPresetList() {
+  try {
+    const presets = await getAllPresets();
+
+    // Clear existing options
+    presetOptionsContainer.innerHTML = '';
+
+    // Add preset options
+    presets.forEach(preset => {
+    const label = document.createElement('label');
+    label.className = 'preset-radio-label';
+    const input = document.createElement('input');
+    input.type = 'radio';
+    input.name = 'preset';
+    input.value = preset.id;
+    input.className = 'preset-option';
+    const span = document.createElement('span');
+    span.textContent = preset.name;
+    label.appendChild(input);
+    label.appendChild(span);
+    presetOptionsContainer.appendChild(label);
+  });
+
+  if (presets.length === 0) {
+    const emptyNote = document.createElement('div');
+    emptyNote.className = 'preset-empty-option';
+    emptyNote.textContent = 'No presets yet. Click "New" to create one.';
+    presetOptionsContainer.appendChild(emptyNote);
+  }
+
+  const newLabel = document.createElement('label');
+  newLabel.className = 'preset-radio-label preset-new-option';
+  const newInput = document.createElement('input');
+  newInput.type = 'radio';
+  newInput.name = 'preset';
+  newInput.value = '__new__';
+  newInput.className = 'preset-option';
+  const newSpan = document.createElement('span');
+  newSpan.textContent = 'New';
+  newLabel.appendChild(newInput);
+  newLabel.appendChild(newSpan);
+  presetOptionsContainer.appendChild(newLabel);
+
+  // Add event listeners to all radio buttons
+  const presetRadios = presetOptionsContainer.querySelectorAll('.preset-option');
+  presetRadios.forEach(radio => {
+    radio.addEventListener('change', async () => {
+      const presetId = radio.value;
+      if (presetId === '__new__') {
+        showPresetNameModal('create');
+        setSelectedPreset(appState.currentPresetId || '');
+        return;
+      }
+      await loadPresetById(presetId);
+    });
+  });
+  } catch (err) {
+    console.warn('Error loading preset list:', err);
+    presetOptionsContainer.innerHTML = '';
+    const emptyNote = document.createElement('div');
+    emptyNote.className = 'preset-empty-option';
+    emptyNote.textContent = 'No presets yet. Click "New" to create one.';
+    presetOptionsContainer.appendChild(emptyNote);
+
+    const newLabel = document.createElement('label');
+    newLabel.className = 'preset-radio-label preset-new-option';
+    const newInput = document.createElement('input');
+    newInput.type = 'radio';
+    newInput.name = 'preset';
+    newInput.value = '__new__';
+    newInput.className = 'preset-option';
+    const newSpan = document.createElement('span');
+    newSpan.textContent = 'New';
+    newLabel.appendChild(newInput);
+    newLabel.appendChild(newSpan);
+    presetOptionsContainer.appendChild(newLabel);
+
+    const presetRadios = presetOptionsContainer.querySelectorAll('.preset-option');
+    presetRadios.forEach(radio => {
+      radio.addEventListener('change', () => {
+        showPresetNameModal('create');
+        setSelectedPreset(appState.currentPresetId || '');
+      });
+    });
+  }
+}
+
+async function createPreset(name) {
+  try {
+    const now = new Date();
+    const preset = {
+      id: generatePresetId(),
+      name: name.trim(),
+      createdAt: now.toISOString(),
+      lastModified: now.toISOString(),
+      order: now.getTime(),
+      ...getCurrentPresetState()
+    };
+
+    await savePreset(preset);
+
+    // Update state
+    appState.currentPresetId = preset.id;
+    appState.presetModified = false;
+
+    // Update UI
+    await loadPresetList();
+    setSelectedPreset(preset.id);
+
+  } catch (err) {
+    console.error('Error creating preset:', err);
+    alert('Failed to save preset. Please try again.');
+  }
+}
+
+async function loadPresetById(presetId) {
+  if (!presetId) return;
+
+  await flushPresetAutoSave();
+
+  try {
+    const preset = await getPreset(presetId);
+    if (!preset) {
+      alert('Preset not found. It may have been deleted.');
+      await loadPresetList();
+      return;
+    }
+
+    // Apply preset
+    await applyPresetState(preset);
+
+    // Update tracking
+    appState.currentPresetId = preset.id;
+    appState.presetModified = false;
+
+  } catch (err) {
+    console.error('Error loading preset:', err);
+    alert('Failed to load preset. Please try again.');
+  }
+}
+
+async function deletePresetById(id) {
+  try {
+    const preset = await getPreset(id);
+    if (!preset) return;
+
+    const confirmed = confirm(`Delete preset "${preset.name}"? This cannot be undone.`);
+    if (!confirmed) return;
+
+    await deletePreset(id);
+
+    // If this was the current preset, clear tracking
+    if (appState.currentPresetId === id) {
+      appState.currentPresetId = null;
+      appState.presetModified = false;
+      setSelectedPreset('');
+    }
+
+    // Refresh lists
+    await loadPresetList();
+    await renderPresetList();
+  } catch (err) {
+    console.error('Error deleting preset:', err);
+    alert('Failed to delete preset. Please try again.');
+  }
+}
+
+async function renamePreset(id, newName) {
+  try {
+    const existing = await getPreset(id);
+    if (!existing) {
+      alert('Preset not found. It may have been deleted.');
+      return;
+    }
+
+    const updated = {
+      ...existing,
+      name: newName.trim(),
+      lastModified: new Date().toISOString()
+    };
+
+    await savePreset(updated);
+    await loadPresetList();
+    await renderPresetList();
+    setSelectedPreset(appState.currentPresetId || updated.id);
+    showPresetSaveStatus('Renamed');
+  } catch (err) {
+    console.error('Error renaming preset:', err);
+    alert('Failed to rename preset. Please try again.');
+  }
+}
+
+function showPresetNameModal(mode = 'create', currentName = '', presetId = null) {
+  presetNameMode = mode;
+  presetNameTargetId = presetId;
+  presetNameInput.value = currentName;
+  presetNameError.textContent = '';
+  presetNameModal.querySelector('h2').textContent = mode === 'create' ? 'New Preset' : 'Rename Preset';
+  presetNameModal.style.display = 'flex';
+  presetNameInput.focus();
+}
+
+async function renderPresetList() {
+  const presets = await getAllPresets();
+  presetListCache = presets;
+
+  if (presets.length === 0) {
+    presetListContainer.innerHTML = `
+      <div class="preset-empty-state">
+        <p>No presets saved yet.</p>
+        <p>Click "New" to create one.</p>
+      </div>
+    `;
+    return;
+  }
+
+  presetListContainer.innerHTML = presets.map(preset => {
+    const isActive = preset.id === appState.currentPresetId;
+    const date = new Date(preset.lastModified);
+    const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+
+    return `
+      <div class="preset-list-item ${isActive ? 'active' : ''}" data-preset-id="${preset.id}">
+        <button class="drag-handle" type="button" aria-label="Reorder preset ${preset.name}">
+          <span class="drag-handle-icon" aria-hidden="true"></span>
+        </button>
+        <div class="preset-item-info">
+          <div class="preset-item-name">${preset.name}</div>
+          <div class="preset-item-meta">Last modified: ${dateStr}</div>
+        </div>
+        <div class="preset-item-actions">
+          <button class="load-preset-btn" data-preset-id="${preset.id}">Load</button>
+          <button class="rename-preset-btn" data-preset-id="${preset.id}">Rename</button>
+          <button class="delete-preset-btn delete-btn" data-preset-id="${preset.id}">Delete</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Add event listeners
+  presetListContainer.querySelectorAll('.load-preset-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = e.target.dataset.presetId;
+      await loadPresetById(id);
+      presetModal.style.display = 'none';
+    });
+  });
+
+  presetListContainer.querySelectorAll('.delete-preset-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = e.target.dataset.presetId;
+      await deletePresetById(id);
+    });
+  });
+
+  presetListContainer.querySelectorAll('.rename-preset-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = e.target.dataset.presetId;
+      const preset = await getPreset(id);
+      if (!preset) return;
+      showPresetNameModal('rename', preset.name, id);
+    });
+  });
+
+  const useNativeDnd = getNativeDndSupport();
+  if (useNativeDnd) {
+    presetListContainer.querySelectorAll('.preset-list-item').forEach(item => {
+      item.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      });
+
+      item.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        const draggedId = e.dataTransfer.getData('text/plain');
+        const targetId = item.dataset.presetId;
+        await reorderPresets(draggedId, targetId);
+      });
+    });
+
+    presetListContainer.querySelectorAll('.drag-handle').forEach(handle => {
+      handle.setAttribute('draggable', 'true');
+      handle.addEventListener('dragstart', (e) => {
+        const item = handle.closest('.preset-list-item');
+        if (!item) return;
+        item.classList.add('dragging');
+        e.dataTransfer.setData('text/plain', item.dataset.presetId);
+        e.dataTransfer.effectAllowed = 'move';
+      });
+
+      handle.addEventListener('dragend', () => {
+        const item = handle.closest('.preset-list-item');
+        if (item) item.classList.remove('dragging');
+      });
+    });
+    return;
+  }
+
+  const clearDropTargets = () => {
+    presetListContainer.querySelectorAll('.preset-list-item.drop-target')
+      .forEach(item => item.classList.remove('drop-target'));
+  };
+
+  const finishPresetReorder = async () => {
+    if (!presetDragState) return;
+    const { draggedId, targetId, draggedItem } = presetDragState;
+    presetDragState = null;
+    clearDropTargets();
+    if (draggedItem) draggedItem.classList.remove('dragging');
+    if (!draggedId || !targetId || draggedId === targetId) return;
+    await reorderPresets(draggedId, targetId);
+  };
+
+  const autoScrollOnDrag = (clientY) => {
+    const rect = presetListContainer.getBoundingClientRect();
+    const edgeDistance = 40;
+    const scrollSpeed = 10;
+    if (clientY < rect.top + edgeDistance) {
+      presetListContainer.scrollTop -= scrollSpeed;
+    } else if (clientY > rect.bottom - edgeDistance) {
+      presetListContainer.scrollTop += scrollSpeed;
+    }
+  };
+
+  presetListContainer.querySelectorAll('.drag-handle').forEach(handle => {
+    handle.addEventListener('pointerdown', (e) => {
+      const item = e.currentTarget.closest('.preset-list-item');
+      if (!item) return;
+      presetDragState = {
+        draggedId: item.dataset.presetId,
+        targetId: null,
+        draggedItem: item
+      };
+      item.classList.add('dragging');
+      handle.setPointerCapture(e.pointerId);
+    });
+
+    handle.addEventListener('pointermove', (e) => {
+      if (!presetDragState) return;
+      const hovered = document.elementFromPoint(e.clientX, e.clientY);
+      const targetItem = hovered?.closest('.preset-list-item');
+      if (!targetItem) {
+        clearDropTargets();
+        presetDragState.targetId = null;
+        autoScrollOnDrag(e.clientY);
+        return;
+      }
+      if (targetItem.dataset.presetId === presetDragState.draggedId) {
+        clearDropTargets();
+        presetDragState.targetId = null;
+        autoScrollOnDrag(e.clientY);
+        return;
+      }
+      clearDropTargets();
+      targetItem.classList.add('drop-target');
+      presetDragState.targetId = targetItem.dataset.presetId;
+      autoScrollOnDrag(e.clientY);
+    });
+
+    handle.addEventListener('pointerup', async () => {
+      await finishPresetReorder();
+    });
+
+    handle.addEventListener('pointercancel', async () => {
+      await finishPresetReorder();
+    });
+  });
+}
+
+async function openPresetManager() {
+  await renderPresetList();
+  presetModal.style.display = 'flex';
+}
+
 
 const stripHtml = (html) => html.replace(/<[^>]*>/g, ' ');
 
@@ -2676,6 +3449,7 @@ const handleChapterSelectionChange = () => {
 
   updateBookToggleStates();
   saveState();
+  markPresetModified();
   if (appState.activeSelector === 'chapter') {
     startDownloadsForSelection();
   } else {
@@ -2723,6 +3497,7 @@ const handleVerseSelectionChange = (changedChapterKey = null, changedBookKey = n
   });
 
   saveState();
+  markPresetModified();
   startVerseDownloadsForSelection(); // Use verse-level downloads for verse selector
   recomputeActiveVerseIds();
   updateStartState();
@@ -3373,6 +4148,7 @@ const toggleChapterSelector = () => {
 
 seasonSelect.addEventListener('change', () => {
   toggleChapterSelector();
+  markPresetModified();
 });
 
 startButton.addEventListener('click', startSession);
@@ -3384,12 +4160,113 @@ answerNextButton.addEventListener('click', goNextFromAnswer);
 answerPrevButton.addEventListener('click', goPrevFromAnswer);
 
 toggleToVerseLink.addEventListener('click', () => {
+  appState.activeSelector = 'verse';
   showSelectorView('verse');
+  markPresetModified();
 });
 
 toggleToChapterLink.addEventListener('click', () => {
+  appState.activeSelector = 'chapter';
   showSelectorView('chapter');
+  markPresetModified();
 });
+
+// Preset event listeners (only if elements exist)
+// Preset radio event listeners are now added in loadPresetList()
+
+if (presetManageButton) {
+  presetManageButton.addEventListener('click', () => {
+    openPresetManager();
+  });
+}
+
+if (presetModalClose) {
+  presetModalClose.addEventListener('click', () => {
+    if (presetModal) presetModal.style.display = 'none';
+  });
+}
+
+if (presetNameModalClose) {
+  presetNameModalClose.addEventListener('click', () => {
+    if (presetNameModal) presetNameModal.style.display = 'none';
+    if (presetNameInput) presetNameInput.value = '';
+    if (presetNameError) presetNameError.textContent = '';
+    presetNameMode = 'create';
+    presetNameTargetId = null;
+  });
+}
+
+if (presetNameSave) {
+  presetNameSave.addEventListener('click', async () => {
+    const name = presetNameInput?.value.trim();
+    if (!name) {
+      if (presetNameError) presetNameError.textContent = 'Please enter a preset name';
+      return;
+    }
+    if (name.length > 50) {
+      if (presetNameError) presetNameError.textContent = 'Name must be 50 characters or less';
+      return;
+    }
+
+    // Check for duplicate
+    const existing = await getPresetByName(name);
+    if (existing && (presetNameMode !== 'rename' || existing.id !== presetNameTargetId)) {
+      if (presetNameError) presetNameError.textContent = 'A preset with this name already exists';
+      return;
+    }
+
+    if (presetNameMode === 'rename' && presetNameTargetId) {
+      await renamePreset(presetNameTargetId, name);
+    } else {
+      await createPreset(name);
+    }
+    if (presetNameModal) presetNameModal.style.display = 'none';
+    if (presetNameInput) presetNameInput.value = '';
+    if (presetNameError) presetNameError.textContent = '';
+    presetNameMode = 'create';
+    presetNameTargetId = null;
+  });
+}
+
+if (presetNameCancel) {
+  presetNameCancel.addEventListener('click', () => {
+    if (presetNameModal) presetNameModal.style.display = 'none';
+    if (presetNameInput) presetNameInput.value = '';
+    if (presetNameError) presetNameError.textContent = '';
+    presetNameMode = 'create';
+    presetNameTargetId = null;
+  });
+}
+
+// Close modals on background click
+if (presetModal) {
+  presetModal.addEventListener('click', (e) => {
+    if (e.target === presetModal) {
+      presetModal.style.display = 'none';
+    }
+  });
+}
+
+if (presetNameModal) {
+  presetNameModal.addEventListener('click', (e) => {
+    if (e.target === presetNameModal) {
+      presetNameModal.style.display = 'none';
+      if (presetNameInput) presetNameInput.value = '';
+      if (presetNameError) presetNameError.textContent = '';
+      presetNameMode = 'create';
+      presetNameTargetId = null;
+    }
+  });
+}
+
+// Enable Enter key to save in name modal
+if (presetNameInput) {
+  presetNameInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      if (presetNameSave) presetNameSave.click();
+    }
+  });
+}
 
 const handleMinBlanksChange = () => {
   if (minBlanksInput.value === '') return; // allow clearing before entering a new number
@@ -3436,6 +4313,7 @@ const handleMinBlanksChange = () => {
   }
 
   saveState();
+  markPresetModified();
 };
 
 const handleMaxBlanksChange = () => {
@@ -3483,6 +4361,7 @@ const handleMaxBlanksChange = () => {
   }
 
   saveState();
+  markPresetModified();
 };
 
 const handleMaxPercentChange = (evt) => {
@@ -3493,6 +4372,7 @@ const handleMaxPercentChange = (evt) => {
   if (evt.type !== 'input') {
     updateBlankInputs();
   }
+  markPresetModified();
 };
 
 // Validate blank inputs (min/max blanks)
@@ -3596,6 +4476,7 @@ const handleFillInBlankPercentageChange = () => {
   validateQuestionTypePercentages();
   updateStartState();
   saveState();
+  markPresetModified();
 };
 
 ['input', 'change'].forEach((evt) => {
@@ -3610,6 +4491,7 @@ if (useOnlyPercentageInput) {
   useOnlyPercentageInput.addEventListener('change', () => {
     appState.useOnlyPercentage = useOnlyPercentageInput.checked;
     updateBlankInputs();
+    markPresetModified();
   });
 }
 
@@ -3633,6 +4515,18 @@ if (typeof window !== 'undefined' && window.__PBE_EXPOSE_TEST_API__) {
     validateQuestionTypePercentages,
     saveState,
     loadState,
+    renderYearOptions,
+    renderChapterOptions,
+    renderVerseOptions,
+    toggleChapterSelector,
+    get chaptersByYear() {
+      return chaptersByYear;
+    },
+    loadChaptersByYear,
+    get books() {
+      return books;
+    },
+    loadBooksData,
   };
 }
 
@@ -3641,6 +4535,39 @@ const shouldAutoInit = typeof window === 'undefined' || !window.__PBE_SKIP_INIT_
 // Initialize app with async state loading
 if (shouldAutoInit) {
   (async () => {
+    // Ensure database is initialized and upgraded first
+    try {
+      const db = await openDatabase();
+      db.close();
+
+      // Check database health
+      const isHealthy = await checkDatabaseHealth();
+      if (!isHealthy) {
+        console.error('Database is in an inconsistent state. You may need to reset it.');
+        console.error('To reset: await window.dbUtils.reset() then reload the page.');
+      }
+    } catch (err) {
+      console.error('Failed to initialize database:', err);
+    }
+
+    // Expose utility functions globally for debugging
+    window.dbUtils = {
+      checkHealth: checkDatabaseHealth,
+      reset: resetDatabase,
+      getVersion: async () => {
+        const db = await openDatabase();
+        const version = db.version;
+        db.close();
+        return version;
+      },
+      getStores: async () => {
+        const db = await openDatabase();
+        const stores = Array.from(db.objectStoreNames);
+        db.close();
+        return stores;
+      }
+    };
+
     await loadBooksData();
     await loadChaptersByYear();
     const initialState = await loadState();
@@ -3664,8 +4591,15 @@ if (shouldAutoInit) {
 
     activeSelector = appState.activeSelector === 'verse' ? 'verse' : 'chapter';
     renderYearOptions(appState.year);
-    if (appState.year) {
-      seasonSelect.value = appState.year;
+    // Explicitly set the select value to ensure it's set before rendering chapters
+    seasonSelect.value = appState.year;
+
+    // Load preset list into dropdown
+    await loadPresetList();
+
+    // If there was a current preset, select it in radio buttons
+    if (appState.currentPresetId) {
+      setSelectedPreset(appState.currentPresetId);
     }
 
     installCompromisePlugin();
