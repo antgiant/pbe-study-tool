@@ -14,12 +14,18 @@ import {
   saveVerse,
   saveVerses,
   deleteVersesByChapter,
+  getAllPresets,
+  getPreset,
+  getPresetByName,
+  savePreset,
+  deletePreset,
   DB_NAME,
   DB_VERSION,
   STORE_SETTINGS,
   STORE_SELECTIONS,
   STORE_CHAPTERS,
   STORE_VERSES,
+  STORE_PRESETS,
 } from '../src/database.js';
 
 describe('Database Operations', () => {
@@ -40,6 +46,7 @@ describe('Database Operations', () => {
       expect(db.objectStoreNames.contains(STORE_SELECTIONS)).toBe(true);
       expect(db.objectStoreNames.contains(STORE_CHAPTERS)).toBe(true);
       expect(db.objectStoreNames.contains(STORE_VERSES)).toBe(true);
+      expect(db.objectStoreNames.contains(STORE_PRESETS)).toBe(true);
       db.close();
     });
 
@@ -374,6 +381,90 @@ describe('Database Operations', () => {
     });
   });
 
+  describe('Preset Operations', () => {
+    it('should save and retrieve a preset by id', async () => {
+      const preset = {
+        id: 'preset-1',
+        name: 'Daily Review',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        lastModified: '2024-01-01T00:00:00.000Z',
+        order: 1,
+        settings: { minBlanks: 2, maxBlanks: 5 },
+      };
+
+      await savePreset(preset);
+      const retrieved = await getPreset('preset-1');
+
+      expect(retrieved).toEqual(preset);
+    });
+
+    it('should retrieve a preset by name', async () => {
+      const preset = {
+        id: 'preset-2',
+        name: 'Weekly Mix',
+        createdAt: '2024-01-02T00:00:00.000Z',
+        lastModified: '2024-01-02T00:00:00.000Z',
+        settings: { minBlanks: 1, maxBlanks: 3 },
+      };
+
+      await savePreset(preset);
+      const retrieved = await getPresetByName('Weekly Mix');
+
+      expect(retrieved).toEqual(preset);
+    });
+
+    it('should return presets sorted by explicit order then createdAt', async () => {
+      const presets = [
+        {
+          id: 'preset-3',
+          name: 'Zebra',
+          createdAt: '2024-01-03T00:00:00.000Z',
+          lastModified: '2024-01-03T00:00:00.000Z',
+          order: 2,
+          settings: {},
+        },
+        {
+          id: 'preset-4',
+          name: 'Alpha',
+          createdAt: '2024-01-01T00:00:00.000Z',
+          lastModified: '2024-01-01T00:00:00.000Z',
+          order: 1,
+          settings: {},
+        },
+        {
+          id: 'preset-5',
+          name: 'No Order',
+          createdAt: '2024-01-02T00:00:00.000Z',
+          lastModified: '2024-01-02T00:00:00.000Z',
+          settings: {},
+        },
+      ];
+
+      await savePreset(presets[0]);
+      await savePreset(presets[1]);
+      await savePreset(presets[2]);
+
+      const result = await getAllPresets();
+      expect(result.map(preset => preset.id)).toEqual(['preset-4', 'preset-3', 'preset-5']);
+    });
+
+    it('should delete a preset', async () => {
+      const preset = {
+        id: 'preset-6',
+        name: 'Temporary',
+        createdAt: '2024-01-04T00:00:00.000Z',
+        lastModified: '2024-01-04T00:00:00.000Z',
+        settings: {},
+      };
+
+      await savePreset(preset);
+      await deletePreset('preset-6');
+
+      const result = await getPreset('preset-6');
+      expect(result).toBeNull();
+    });
+  });
+
   describe('Error Handling', () => {
     it('should handle database errors gracefully in getSettings', async () => {
       // Close all databases to force an error scenario
@@ -392,6 +483,38 @@ describe('Database Operations', () => {
       // Try to save invalid data that might cause issues
       // Note: IndexedDB is quite permissive, so this might not actually throw
       await expect(updateSettings({ valid: 'data' })).resolves.not.toThrow();
+    });
+
+    it('should return null when IndexedDB is unavailable in getSelections', async () => {
+      const originalIndexedDB = global.indexedDB;
+      try {
+        global.indexedDB = undefined;
+        const result = await getSelections();
+        expect(result).toBeNull();
+      } finally {
+        global.indexedDB = originalIndexedDB;
+      }
+    });
+
+    it('should return empty array when IndexedDB is unavailable in getAllPresets', async () => {
+      const originalIndexedDB = global.indexedDB;
+      try {
+        global.indexedDB = undefined;
+        const result = await getAllPresets();
+        expect(result).toEqual([]);
+      } finally {
+        global.indexedDB = originalIndexedDB;
+      }
+    });
+
+    it('should throw when IndexedDB is unavailable in updateSettings', async () => {
+      const originalIndexedDB = global.indexedDB;
+      try {
+        global.indexedDB = undefined;
+        await expect(updateSettings({ year: '2025' })).rejects.toBeInstanceOf(Error);
+      } finally {
+        global.indexedDB = originalIndexedDB;
+      }
     });
   });
 });
