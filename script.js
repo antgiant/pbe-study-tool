@@ -3153,18 +3153,13 @@ const applyBlanks = (htmlText, blanks, verseId) => {
   // Calculate target number of blanks
   const target = Math.min(maxBlanksAllowed, candidates.length);
 
-  // Select a larger pool of candidate words (up to 2x target or all candidates)
-  // This gives us more words to choose from when we have duplicates
-  const poolSize = Math.min(target * 2, candidates.length);
-  const wordsInPriorityOrder = sortedCandidates
-    .slice(0, poolSize)
-    .map(c => termsWithPriority[c.idx]?.text?.toLowerCase())
-    .filter(Boolean);
+  // Pool of candidate words to consider, maintaining priority order
+  const prioritizedCandidates = sortedCandidates.slice(0, Math.min(target * 2, candidates.length));
 
-  // Replace words in the original HTML, preserving tags
-  // First, find all matches grouped by word
+  // Find all occurrences of each unique candidate word in the original text
+  const uniqueWords = [...new Set(prioritizedCandidates.map(c => c.text.toLowerCase()))];
   const matchesByWord = new Map();
-  wordsInPriorityOrder.forEach(word => {
+  uniqueWords.forEach(word => {
     const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const regex = new RegExp(`\\b${escapedWord}\\b`, 'ig');
     let match;
@@ -3175,7 +3170,6 @@ const applyBlanks = (htmlText, blanks, verseId) => {
         index: match.index,
         lowerWord: word
       });
-      // Prevent infinite loop on zero-width matches
       if (match.index === regex.lastIndex) {
         regex.lastIndex++;
       }
@@ -3185,39 +3179,53 @@ const applyBlanks = (htmlText, blanks, verseId) => {
     }
   });
 
-  // Now select blanks in priority order, randomly choosing occurrences
-  // Shuffle occurrences for each word once
-  const shuffledOccurrencesByWord = new Map();
-  wordsInPriorityOrder.forEach(word => {
-    const occurrences = matchesByWord.get(word);
-    if (occurrences && occurrences.length > 0) {
-      shuffledOccurrencesByWord.set(word, [...occurrences].sort(() => Math.random() - 0.5));
-    }
+  // Shuffle the occurrences of each word to ensure random selection
+  const availableOccurrences = new Map();
+  matchesByWord.forEach((matches, word) => {
+    availableOccurrences.set(word, [...matches].sort(() => Math.random() - 0.5));
   });
 
-  // Select blanks round-robin: one occurrence from each word in priority order
+  // Select words to blank based on priority, handling duplicates correctly.
   const blanksToApply = [];
-  let blanksRemaining = target;
-  let round = 0;
+  const appliedIndices = new Set();
 
-  while (blanksRemaining > 0) {
-    let addedThisRound = false;
+  // First pass: iterate through prioritized candidates and pick one occurrence for each
+  for (const candidate of prioritizedCandidates) {
+    if (blanksToApply.length >= target) break;
 
-    for (const word of wordsInPriorityOrder) {
-      if (blanksRemaining <= 0) break;
+    const lowerWord = candidate.text.toLowerCase();
+    const occurrences = availableOccurrences.get(lowerWord);
 
-      const occurrences = shuffledOccurrencesByWord.get(word);
-      if (!occurrences || round >= occurrences.length) continue;
-
-      // Take one occurrence from this word for this round
-      blanksToApply.push(occurrences[round]);
-      blanksRemaining--;
-      addedThisRound = true;
+    if (occurrences && occurrences.length > 0) {
+      const occurrence = occurrences.shift(); // Take the next available occurrence
+      if (occurrence && !appliedIndices.has(occurrence.index)) {
+        blanksToApply.push(occurrence);
+        appliedIndices.add(occurrence.index);
+      }
     }
+  }
 
-    // If we didn't add any blanks this round, we've exhausted all words
-    if (!addedThisRound) break;
-    round++;
+  // Second pass: if we still don't have enough blanks (e.g., due to duplicates),
+  // keep taking from available occurrences until the target is met.
+  while (blanksToApply.length < target) {
+    let addedInPass = false;
+    for (const candidate of prioritizedCandidates) {
+      if (blanksToApply.length >= target) break;
+
+      const lowerWord = candidate.text.toLowerCase();
+      const occurrences = availableOccurrences.get(lowerWord);
+
+      if (occurrences && occurrences.length > 0) {
+        const occurrence = occurrences.shift();
+        if (occurrence && !appliedIndices.has(occurrence.index)) {
+          blanksToApply.push(occurrence);
+          appliedIndices.add(occurrence.index);
+          addedInPass = true;
+        }
+      }
+    }
+    // If a full pass adds nothing, we're out of options.
+    if (!addedInPass) break;
   }
 
   // Sort by position in text to apply in order

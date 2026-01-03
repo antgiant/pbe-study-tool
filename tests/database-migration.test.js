@@ -196,6 +196,21 @@ describe('Database migration helpers', () => {
     globalThis.localStorage = originalLocalStorage;
   });
 
+  it('returns false when no migration sources are available', async () => {
+    await createLegacyStore();
+    const originalLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createLocalStorage();
+
+    const migrated = await checkAndMigrateSchema();
+
+    expect(migrated).toBe(false);
+    globalThis.localStorage = originalLocalStorage;
+  });
+
+  it('throws when migration receives an invalid state payload', async () => {
+    await expect(migrateToOptimizedSchema(null)).rejects.toBeDefined();
+  });
+
   it('handles health check failures', async () => {
     const originalIndexedDB = globalThis.indexedDB;
     globalThis.indexedDB = undefined;
