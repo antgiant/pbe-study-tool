@@ -335,11 +335,17 @@ input[data-question-type-percentage]:invalid {
   color: #d6e2f7;
 }
 
-.blanked-word {
+.blank {
+  cursor: pointer;
   text-decoration: underline;
-  font-weight: bold;
-  text-decoration-thickness: 2px;
+  border-bottom: 2px dotted;
   text-underline-offset: 2px;
+}
+
+.blank.revealed {
+  font-weight: bold;
+  border-bottom: none;
+  text-decoration: underline;
 }
 
 .hint-button {

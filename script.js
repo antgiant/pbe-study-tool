@@ -3239,8 +3239,8 @@ const applyBlanks = (htmlText, blanks, verseId) => {
     answerResult += raw.slice(cursor, idx);
 
     blankedWords.push(word);
-    blankedResult += '_________';
-    answerResult += `<span class="blanked-word">${word}</span>`;
+    blankedResult += `<span class="blank" data-word="${word}">_________</span>`;
+    answerResult += `<span class="blank revealed" data-word="${word}">${word}</span>`;
     cursor = idx + word.length;
   });
 
@@ -3281,10 +3281,15 @@ const updateQuestionView = () => {
   const blankedWords = questionBlankedWordsList[questionIndex] || [];
   let displayText = questionBlanksList[questionIndex];
 
-  for (let i = 0; i < hintsRevealed && i < blankedWords.length; i++) {
-    const word = blankedWords[i];
-    const blankRegex = new RegExp('_________', '');
-    displayText = displayText.replace(blankRegex, `<span class="blanked-word">${word}</span>`);
+  if (hintsRevealed > 0) {
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = displayText;
+    const blanks = tempDiv.querySelectorAll('.blank:not(.revealed)');
+    for (let i = 0; i < hintsRevealed && i < blanks.length; i++) {
+      blanks[i].textContent = blanks[i].dataset.word;
+      blanks[i].classList.add('revealed', 'hint-revealed');
+    }
+    displayText = tempDiv.innerHTML;
   }
 
   questionText.innerHTML = displayText;
@@ -3324,8 +3329,6 @@ const startSession = () => {
 
 const showAnswer = () => {
   if (!sessionActive || questionOrder.length === 0) return;
-  // Reset hints for current question when leaving question screen
-  hintsRevealedList[questionIndex] = 0;
 
   questionArea.style.display = 'none';
   answerArea.style.display = 'block';
@@ -3401,6 +3404,21 @@ const revealHint = () => {
   }
 };
 
+const toggleBlank = (event) => {
+  const target = event.target;
+  if (!target.classList.contains('blank')) return;
+
+  const word = target.dataset.word;
+  if (target.classList.contains('revealed')) {
+    target.textContent = '_________';
+    target.classList.remove('revealed');
+  } else {
+    target.textContent = word;
+    target.classList.add('revealed');
+  }
+};
+
+
 const showSelectorView = (mode) => {
   activeSelector = mode === 'verse' ? 'verse' : 'chapter';
   appState.activeSelector = activeSelector;
@@ -3473,6 +3491,10 @@ seasonSelect.addEventListener('change', () => {
 
 startButton.addEventListener('click', startSession);
 selectorsToggle.addEventListener('click', () => toggleSelectors());
+answerText.addEventListener('click', (e) => {
+  e.stopPropagation();
+});
+questionText.addEventListener('click', toggleBlank);
 nextButton.addEventListener('click', showAnswer);
 prevButton.addEventListener('click', goPrev);
 hintButton.addEventListener('click', revealHint);
