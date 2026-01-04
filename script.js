@@ -26,6 +26,9 @@ import {
   getPresetByName,
   savePreset,
   deletePreset,
+  ensureNonePreset,
+  NONE_PRESET_ID,
+  NONE_PRESET_NAME,
 } from './src/database.js';
 
 const seasonSelect = document.getElementById('year');
@@ -631,6 +634,17 @@ let presetNameTargetId = null;
 let presetListCache = [];
 let presetDragState = null;
 
+const isNonePreset = (preset) => preset?.id === NONE_PRESET_ID;
+
+const ensureNonePresetExists = async () => {
+  const preset = await ensureNonePreset(getCurrentPresetState());
+  if (!appState.currentPresetId) {
+    appState.currentPresetId = preset.id;
+    appState.presetModified = false;
+  }
+  return preset;
+};
+
 const getNativeDndSupport = () => {
   if (typeof window === 'undefined') return false;
   const supportsDrag = 'draggable' in document.createElement('div');
@@ -639,6 +653,7 @@ const getNativeDndSupport = () => {
 };
 
 const reorderPresets = async (draggedId, targetId) => {
+  if (draggedId === NONE_PRESET_ID || targetId === NONE_PRESET_ID) return;
   if (!draggedId || !targetId || draggedId === targetId) return;
 
   const fromIndex = presetListCache.findIndex(p => p.id === draggedId);
@@ -730,6 +745,7 @@ function setSelectedPreset(presetId) {
 
 async function loadPresetList() {
   try {
+    await ensureNonePresetExists();
     const presets = await getAllPresets();
 
     // Clear existing options
@@ -873,6 +889,7 @@ async function deletePresetById(id) {
   try {
     const preset = await getPreset(id);
     if (!preset) return;
+    if (isNonePreset(preset)) return;
 
     const confirmed = confirm(`Delete preset "${preset.name}"? This cannot be undone.`);
     if (!confirmed) return;
@@ -902,6 +919,7 @@ async function renamePreset(id, newName) {
       alert('Preset not found. It may have been deleted.');
       return;
     }
+    if (isNonePreset(existing)) return;
 
     const updated = {
       ...existing,
@@ -931,6 +949,7 @@ function showPresetNameModal(mode = 'create', currentName = '', presetId = null)
 }
 
 async function renderPresetList() {
+  await ensureNonePresetExists();
   const presets = await getAllPresets();
   presetListCache = presets;
 
@@ -946,12 +965,13 @@ async function renderPresetList() {
 
   presetListContainer.innerHTML = presets.map(preset => {
     const isActive = preset.id === appState.currentPresetId;
+    const locked = isNonePreset(preset);
     const date = new Date(preset.lastModified);
     const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
 
     return `
       <div class="preset-list-item ${isActive ? 'active' : ''}" data-preset-id="${preset.id}">
-        <button class="drag-handle" type="button" aria-label="Reorder preset ${preset.name}">
+        <button class="drag-handle" type="button" aria-label="Reorder preset ${preset.name}" ${locked ? 'disabled aria-disabled="true"' : ''}>
           <span class="drag-handle-icon" aria-hidden="true"></span>
         </button>
         <div class="preset-item-info">
@@ -960,8 +980,8 @@ async function renderPresetList() {
         </div>
         <div class="preset-item-actions">
           <button class="load-preset-btn" data-preset-id="${preset.id}">Load</button>
-          <button class="rename-preset-btn" data-preset-id="${preset.id}">Rename</button>
-          <button class="delete-preset-btn delete-btn" data-preset-id="${preset.id}">Delete</button>
+          <button class="rename-preset-btn" data-preset-id="${preset.id}" ${locked ? 'disabled aria-disabled="true"' : ''}>Rename</button>
+          <button class="delete-preset-btn delete-btn" data-preset-id="${preset.id}" ${locked ? 'disabled aria-disabled="true"' : ''}>Delete</button>
         </div>
       </div>
     `;
@@ -976,14 +996,14 @@ async function renderPresetList() {
     });
   });
 
-  presetListContainer.querySelectorAll('.delete-preset-btn').forEach(btn => {
+  presetListContainer.querySelectorAll('.delete-preset-btn:not([disabled])').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       const id = e.target.dataset.presetId;
       await deletePresetById(id);
     });
   });
 
-  presetListContainer.querySelectorAll('.rename-preset-btn').forEach(btn => {
+  presetListContainer.querySelectorAll('.rename-preset-btn:not([disabled])').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       const id = e.target.dataset.presetId;
       const preset = await getPreset(id);
@@ -1008,7 +1028,7 @@ async function renderPresetList() {
       });
     });
 
-    presetListContainer.querySelectorAll('.drag-handle').forEach(handle => {
+    presetListContainer.querySelectorAll('.drag-handle:not([disabled])').forEach(handle => {
       handle.setAttribute('draggable', 'true');
       handle.addEventListener('dragstart', (e) => {
         const item = handle.closest('.preset-list-item');
@@ -1052,7 +1072,7 @@ async function renderPresetList() {
     }
   };
 
-  presetListContainer.querySelectorAll('.drag-handle').forEach(handle => {
+  presetListContainer.querySelectorAll('.drag-handle:not([disabled])').forEach(handle => {
     handle.addEventListener('pointerdown', (e) => {
       const item = e.currentTarget.closest('.preset-list-item');
       if (!item) return;
@@ -3551,6 +3571,10 @@ if (presetNameSave) {
     const name = presetNameInput?.value.trim();
     if (!name) {
       if (presetNameError) presetNameError.textContent = 'Please enter a preset name';
+      return;
+    }
+    if (name.toLowerCase() === NONE_PRESET_NAME.toLowerCase()) {
+      if (presetNameError) presetNameError.textContent = '"None" is reserved';
       return;
     }
     if (name.length > 50) {

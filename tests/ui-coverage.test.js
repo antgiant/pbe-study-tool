@@ -270,8 +270,8 @@ describe('UI coverage flow', () => {
     testApi.markPresetModified();
     await new Promise((resolve) => setTimeout(resolve, 600));
     await testApi.flushPresetAutoSave();
-    const dragHandles = document.querySelectorAll('.drag-handle');
-    const presetItems = document.querySelectorAll('.preset-list-item');
+    const dragHandles = document.querySelectorAll('.drag-handle:not([disabled])');
+    const presetItems = document.querySelectorAll('.preset-list-item:not([data-preset-id="preset-none"])');
     const dataTransfer = {
       data: {},
       setData(type, value) {
@@ -474,6 +474,17 @@ describe('UI coverage flow', () => {
     await testApi.deletePresetById(presetId);
   });
 
+  it('locks None preset actions', async () => {
+    await testApi.loadPresetList();
+    await testApi.renderPresetList();
+
+    const noneItem = document.querySelector('.preset-list-item[data-preset-id="preset-none"]');
+    expect(noneItem).toBeTruthy();
+    expect(noneItem.querySelector('.rename-preset-btn').disabled).toBe(true);
+    expect(noneItem.querySelector('.delete-preset-btn').disabled).toBe(true);
+    expect(noneItem.querySelector('.drag-handle').disabled).toBe(true);
+  });
+
   it('covers fallback preset drag interactions', async () => {
     const originalMatchMedia = window.matchMedia;
     window.matchMedia = vi.fn().mockImplementation(() => ({
@@ -486,8 +497,8 @@ describe('UI coverage flow', () => {
     await testApi.createPreset('Drag B');
     await testApi.renderPresetList();
 
-    const handles = document.querySelectorAll('.drag-handle');
-    const items = document.querySelectorAll('.preset-list-item');
+    const handles = document.querySelectorAll('.drag-handle:not([disabled])');
+    const items = document.querySelectorAll('.preset-list-item:not([data-preset-id="preset-none"])');
     handles[0].setPointerCapture = vi.fn();
     const originalElementFromPoint = document.elementFromPoint;
     document.elementFromPoint = vi.fn(() => items[1]);

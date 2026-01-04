@@ -9,6 +9,8 @@ export const STORE_SELECTIONS = 'selections';
 export const STORE_CHAPTERS = 'chapters';
 export const STORE_VERSES = 'verses';
 export const STORE_PRESETS = 'presets';
+export const NONE_PRESET_ID = 'preset-none';
+export const NONE_PRESET_NAME = 'None';
 export const LEGACY_STORE = 'appState';
 export const STATE_KEY = 'currentState';
 export const STORAGE_KEY = 'pbeSettings';
@@ -589,16 +591,27 @@ export const getAllPresets = async () => {
       const transaction = db.transaction([STORE_PRESETS], 'readonly');
       const store = transaction.objectStore(STORE_PRESETS);
       const request = store.getAll();
-      request.onsuccess = () => {
+      request.onsuccess = async () => {
         db.close();
-        const presets = request.result || [];
-        // Sort by explicit order or createdAt ascending
-        presets.sort((a, b) => {
-          const aOrder = Number.isFinite(a.order) ? a.order : new Date(a.createdAt || 0).getTime();
-          const bOrder = Number.isFinite(b.order) ? b.order : new Date(b.createdAt || 0).getTime();
-          return aOrder - bOrder;
-        });
-        resolve(presets);
+        try {
+          let presets = request.result || [];
+          const nonePreset = await ensureNonePreset();
+          if (nonePreset) {
+            presets = presets.filter(preset => preset.id !== NONE_PRESET_ID);
+            presets.unshift(nonePreset);
+          }
+          // Sort by explicit order or createdAt ascending, with None always first.
+          presets.sort((a, b) => {
+            if (a.id === NONE_PRESET_ID) return -1;
+            if (b.id === NONE_PRESET_ID) return 1;
+            const aOrder = Number.isFinite(a.order) ? a.order : new Date(a.createdAt || 0).getTime();
+            const bOrder = Number.isFinite(b.order) ? b.order : new Date(b.createdAt || 0).getTime();
+            return aOrder - bOrder;
+          });
+          resolve(presets);
+        } catch (err) {
+          reject(err);
+        }
       };
       request.onerror = () => {
         db.close();
@@ -699,6 +712,7 @@ export const savePreset = async (preset) => {
  * @returns {Promise<void>}
  */
 export const deletePreset = async (id) => {
+  if (id === NONE_PRESET_ID) return;
   try {
     const db = await openDatabase();
     return new Promise((resolve, reject) => {
@@ -718,6 +732,61 @@ export const deletePreset = async (id) => {
     console.warn('Error deleting preset:', err);
     throw err;
   }
+};
+
+const buildNonePreset = (defaults = {}) => {
+  const now = defaults.timestamp || new Date().toISOString();
+  return {
+    id: NONE_PRESET_ID,
+    name: NONE_PRESET_NAME,
+    createdAt: defaults.createdAt || now,
+    lastModified: defaults.lastModified || now,
+    order: 0,
+    year: defaults.year || '',
+    activeChapters: defaults.activeChapters || [],
+    verseSelections: defaults.verseSelections || {},
+    activeSelector: defaults.activeSelector || 'chapter',
+    minBlanks: Number.isFinite(defaults.minBlanks) ? defaults.minBlanks : 1,
+    maxBlanks: Number.isFinite(defaults.maxBlanks) ? defaults.maxBlanks : 1,
+    maxBlankPercentage: Number.isFinite(defaults.maxBlankPercentage) ? defaults.maxBlankPercentage : 100,
+    useOnlyPercentage: Boolean(defaults.useOnlyPercentage),
+    fillInBlankPercentage: Number.isFinite(defaults.fillInBlankPercentage) ? defaults.fillInBlankPercentage : 100,
+  };
+};
+
+export const ensureNonePreset = async (stateOverrides = {}) => {
+  const existing = await getPreset(NONE_PRESET_ID);
+  if (existing) {
+    const needsUpdate = existing.name !== NONE_PRESET_NAME || existing.order !== 0;
+    if (!needsUpdate) return existing;
+    const updated = {
+      ...existing,
+      name: NONE_PRESET_NAME,
+      order: 0,
+    };
+    await savePreset(updated);
+    return updated;
+  }
+
+  const [settings, selections] = await Promise.all([
+    getSettings(),
+    getSelections(),
+  ]);
+
+  const preset = buildNonePreset({
+    ...stateOverrides,
+    year: stateOverrides.year ?? settings?.year ?? '',
+    activeChapters: stateOverrides.activeChapters ?? selections?.activeChapters ?? [],
+    verseSelections: stateOverrides.verseSelections ?? selections?.verseSelections ?? {},
+    activeSelector: stateOverrides.activeSelector ?? settings?.activeSelector ?? 'chapter',
+    minBlanks: stateOverrides.minBlanks ?? settings?.minBlanks ?? 1,
+    maxBlanks: stateOverrides.maxBlanks ?? settings?.maxBlanks ?? 1,
+    maxBlankPercentage: stateOverrides.maxBlankPercentage ?? settings?.maxBlankPercentage ?? 100,
+    useOnlyPercentage: stateOverrides.useOnlyPercentage ?? settings?.useOnlyPercentage ?? false,
+    fillInBlankPercentage: stateOverrides.fillInBlankPercentage ?? settings?.fillInBlankPercentage ?? 100,
+  });
+  await savePreset(preset);
+  return preset;
 };
 
 export const migrateToOptimizedSchema = async (oldState, options = {}) => {

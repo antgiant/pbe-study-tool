@@ -1,10 +1,13 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   getAllPresets,
   getPreset,
   getPresetByName,
   savePreset,
-  deletePreset
+  deletePreset,
+  ensureNonePreset,
+  NONE_PRESET_ID,
+  NONE_PRESET_NAME
 } from '../src/database.js';
 
 describe('Preset Functionality', () => {
@@ -12,7 +15,7 @@ describe('Preset Functionality', () => {
     beforeEach(async () => {
       // Clear all presets before each test
       const presets = await getAllPresets();
-      await Promise.all(presets.map(p => deletePreset(p.id)));
+      await Promise.all(presets.filter(p => p.id !== NONE_PRESET_ID).map(p => deletePreset(p.id)));
     });
 
     it('should create a new preset', async () => {
@@ -194,6 +197,49 @@ describe('Preset Functionality', () => {
       expect(ourPresets[2].name).toBe('Third');
     });
 
+    it('should always include None preset first', async () => {
+      await ensureNonePreset();
+      const preset = {
+        id: 'test-none-order',
+        name: 'After None',
+        createdAt: new Date().toISOString(),
+        lastModified: new Date().toISOString(),
+        year: '2024-2025',
+        activeChapters: [],
+        verseSelections: {},
+        activeSelector: 'chapter',
+        minBlanks: 1,
+        maxBlanks: 1,
+        maxBlankPercentage: 100,
+        useOnlyPercentage: false,
+        fillInBlankPercentage: 100
+      };
+      await savePreset(preset);
+      const allPresets = await getAllPresets();
+      expect(allPresets[0].id).toBe(NONE_PRESET_ID);
+      expect(allPresets[0].name).toBe(NONE_PRESET_NAME);
+    });
+
+    it('should not delete the None preset', async () => {
+      await ensureNonePreset();
+      await deletePreset(NONE_PRESET_ID);
+      const retrieved = await getPreset(NONE_PRESET_ID);
+      expect(retrieved).toBeTruthy();
+      expect(retrieved.name).toBe(NONE_PRESET_NAME);
+    });
+
+    it('should allow updates to the None preset', async () => {
+      const nonePreset = await ensureNonePreset();
+      const updated = {
+        ...nonePreset,
+        minBlanks: 3,
+        lastModified: new Date().toISOString()
+      };
+      await savePreset(updated);
+      const retrieved = await getPreset(NONE_PRESET_ID);
+      expect(retrieved.minBlanks).toBe(3);
+    });
+
     it('should handle non-existent preset gracefully', async () => {
       const result = await getPreset('non-existent-id');
       expect(result).toBeNull();
@@ -251,7 +297,7 @@ describe('Preset Functionality', () => {
   describe('Preset Name Validation', () => {
     beforeEach(async () => {
       const presets = await getAllPresets();
-      await Promise.all(presets.map(p => deletePreset(p.id)));
+      await Promise.all(presets.filter(p => p.id !== NONE_PRESET_ID).map(p => deletePreset(p.id)));
     });
 
     it('should detect duplicate names', async () => {
@@ -324,7 +370,7 @@ describe('Preset Functionality', () => {
   describe('Preset Data Integrity', () => {
     beforeEach(async () => {
       const presets = await getAllPresets();
-      await Promise.all(presets.map(p => deletePreset(p.id)));
+      await Promise.all(presets.filter(p => p.id !== NONE_PRESET_ID).map(p => deletePreset(p.id)));
     });
 
     it('should preserve verse selection structure', async () => {
@@ -416,7 +462,7 @@ describe('Preset Functionality', () => {
   describe('Multiple Presets', () => {
     beforeEach(async () => {
       const presets = await getAllPresets();
-      await Promise.all(presets.map(p => deletePreset(p.id)));
+      await Promise.all(presets.filter(p => p.id !== NONE_PRESET_ID).map(p => deletePreset(p.id)));
     });
 
     it('should handle multiple presets independently', async () => {

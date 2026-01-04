@@ -19,6 +19,7 @@ import {
   getPresetByName,
   savePreset,
   deletePreset,
+  NONE_PRESET_ID,
   DB_NAME,
   DB_VERSION,
   STORE_SETTINGS,
@@ -445,7 +446,12 @@ describe('Database Operations', () => {
       await savePreset(presets[2]);
 
       const result = await getAllPresets();
-      expect(result.map(preset => preset.id)).toEqual(['preset-4', 'preset-3', 'preset-5']);
+      expect(result.map(preset => preset.id)).toEqual([
+        NONE_PRESET_ID,
+        'preset-4',
+        'preset-3',
+        'preset-5',
+      ]);
     });
 
     it('should delete a preset', async () => {
