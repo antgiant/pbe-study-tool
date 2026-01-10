@@ -3358,6 +3358,15 @@ const startSession = () => {
 const showAnswer = () => {
   if (!sessionActive || questionOrder.length === 0) return;
 
+  // Check if all blanks are revealed in question mode
+  const hintsRevealed = hintsRevealedList[questionIndex] || 0;
+  const blankedWords = questionBlankedWordsList[questionIndex] || [];
+  if (blankedWords.length > 0 && hintsRevealed >= blankedWords.length) {
+    // All answers are revealed, skip answer screen and go to next question
+    goNextFromAnswer();
+    return;
+  }
+
   questionArea.style.display = 'none';
   answerArea.style.display = 'block';
 
