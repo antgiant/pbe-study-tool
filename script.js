@@ -3359,10 +3359,11 @@ const startSession = () => {
 const showAnswer = () => {
   if (!sessionActive || questionOrder.length === 0) return;
 
-  // Check if all blanks are revealed in question mode
-  const hintsRevealed = hintsRevealedList[questionIndex] || 0;
+  // Check if all blanks are revealed in question mode (either via hints or direct clicks)
   const blankedWords = questionBlankedWordsList[questionIndex] || [];
-  if (blankedWords.length > 0 && hintsRevealed >= blankedWords.length) {
+  const totalBlanks = questionText.querySelectorAll('.blank').length;
+  const revealedBlanks = questionText.querySelectorAll('.blank.revealed').length;
+  if (blankedWords.length > 0 && totalBlanks > 0 && revealedBlanks >= totalBlanks) {
     // All answers are revealed, skip answer screen and go to next question
     goNextFromAnswer();
     return;
