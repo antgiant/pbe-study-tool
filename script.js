@@ -3322,6 +3322,10 @@ const updateQuestionView = () => {
   }
 
   questionText.innerHTML = displayText;
+  
+  // Scale any revealed blanks to fit
+  questionText.querySelectorAll('.blank.revealed').forEach(scaleToFit);
+  
   prevButton.disabled = questionIndex === 0;
 
   // Update hint button state
@@ -3454,6 +3458,43 @@ const revealHint = () => {
   }
 };
 
+const scaleToFit = (element) => {
+  // Reset any previous scaling
+  element.style.fontSize = '';
+  
+  // Lock the width in pixels before any font-size changes
+  // (since CSS 'em' width would shrink with font-size)
+  const containerWidth = element.getBoundingClientRect().width;
+  element.style.width = `${containerWidth}px`;
+  
+  // Get the computed styles from the element's parent context
+  const computedStyle = window.getComputedStyle(element);
+  const baseFontSize = parseFloat(computedStyle.fontSize);
+  
+  // Create a temporary span to measure the actual text width
+  const tempSpan = document.createElement('span');
+  tempSpan.style.cssText = `
+    position: absolute;
+    visibility: hidden;
+    white-space: nowrap;
+    font-family: ${computedStyle.fontFamily};
+    font-size: ${baseFontSize}px;
+    font-weight: bold;
+    letter-spacing: ${computedStyle.letterSpacing};
+  `;
+  tempSpan.textContent = element.textContent;
+  document.body.appendChild(tempSpan);
+  const textWidth = tempSpan.getBoundingClientRect().width;
+  document.body.removeChild(tempSpan);
+  
+  if (textWidth > containerWidth && containerWidth > 0) {
+    // Scale by reducing font-size - this affects actual layout
+    const scale = containerWidth / textWidth;
+    const newFontSize = baseFontSize * scale * 0.95; // 0.95 for small safety margin
+    element.style.fontSize = `${newFontSize}px`;
+  }
+};
+
 const toggleBlank = (event) => {
   const target = event.target;
   if (!target.classList.contains('blank')) return;
@@ -3461,10 +3502,14 @@ const toggleBlank = (event) => {
   const word = target.dataset.word;
   if (target.classList.contains('revealed')) {
     target.textContent = '_________';
+    target.style.fontSize = '';
+    target.style.width = '';
     target.classList.remove('revealed');
   } else {
     target.textContent = word;
     target.classList.add('revealed');
+    // Scale down long words to fit within the blank width
+    scaleToFit(target);
   }
 
   // Sync hint count with actual revealed blanks

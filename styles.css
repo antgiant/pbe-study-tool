@@ -339,9 +339,10 @@ input[data-question-type-percentage]:invalid {
   cursor: pointer;
   border-bottom: 2px dotted;
   display: inline-block;
-  min-width: 5.4em;
+  width: 5.4em;
   text-align: center;
   vertical-align: baseline;
+  white-space: nowrap;
 }
 
 .blank.revealed {
