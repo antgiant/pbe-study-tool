@@ -3434,12 +3434,23 @@ const goPrevFromAnswer = () => {
 
 const revealHint = () => {
   if (!sessionActive || questionOrder.length === 0) return;
-  const currentHints = hintsRevealedList[questionIndex] || 0;
   const blankedWords = questionBlankedWordsList[questionIndex] || [];
 
-  if (currentHints < blankedWords.length) {
-    hintsRevealedList[questionIndex] = currentHints + 1;
-    updateQuestionView();
+  // Find the next unrevealed blank in the DOM
+  const nextUnrevealed = questionText.querySelector('.blank:not(.revealed)');
+  if (nextUnrevealed) {
+    nextUnrevealed.textContent = nextUnrevealed.dataset.word;
+    nextUnrevealed.classList.add('revealed', 'hint-revealed');
+    // Update the hint count
+    const revealedCount = questionText.querySelectorAll('.blank.revealed').length;
+    hintsRevealedList[questionIndex] = revealedCount;
+    // Update hint button state
+    if (revealedCount >= blankedWords.length) {
+      hintButton.disabled = true;
+      hintButton.textContent = 'No more hints';
+    } else {
+      hintButton.textContent = `Hint (${revealedCount}/${blankedWords.length})`;
+    }
   }
 };
 
@@ -3454,6 +3465,20 @@ const toggleBlank = (event) => {
   } else {
     target.textContent = word;
     target.classList.add('revealed');
+  }
+
+  // Sync hint count with actual revealed blanks
+  const blankedWords = questionBlankedWordsList[questionIndex] || [];
+  const revealedCount = questionText.querySelectorAll('.blank.revealed').length;
+  hintsRevealedList[questionIndex] = revealedCount;
+
+  // Update hint button state
+  if (revealedCount >= blankedWords.length) {
+    hintButton.disabled = true;
+    hintButton.textContent = 'No more hints';
+  } else {
+    hintButton.disabled = false;
+    hintButton.textContent = `Hint (${revealedCount}/${blankedWords.length})`;
   }
 };
 
