@@ -3267,6 +3267,7 @@ const applyBlanks = (htmlText, blanks, verseId) => {
     answerResult += raw.slice(cursor, idx);
 
     blankedWords.push(word);
+    // Use fixed-width blanks to avoid giving hints about word length
     blankedResult += `<span class="blank" data-word="${word}">_________</span>`;
     answerResult += `<span class="blank revealed" data-word="${word}">${word}</span>`;
     cursor = idx + word.length;
