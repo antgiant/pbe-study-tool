@@ -4064,6 +4064,166 @@ if (typeof window !== 'undefined' && window.__PBE_EXPOSE_TEST_API__) {
 
 const shouldAutoInit = typeof window === 'undefined' || !window.__PBE_SKIP_INIT__;
 
+// Rogue Sheep Easter Egg
+const rogueSheepCheckbox = document.getElementById('rogue-sheep');
+let rogueSheepInterval = null;
+let activeSheep = [];
+
+function createRogueSheep() {
+  const sheep = document.createElement('div');
+  sheep.className = 'rogue-sheep';
+  sheep.textContent = Math.random() < 0.5 ? '🐑' : '🐏';
+  sheep.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(sheep);
+
+  const viewWidth = window.innerWidth;
+  const viewHeight = window.innerHeight;
+
+  // Random starting position (off-screen)
+  const side = Math.floor(Math.random() * 4); // 0: top, 1: right, 2: bottom, 3: left
+  let x, y;
+
+  switch (side) {
+    case 0: // Enter from top
+      x = Math.random() * viewWidth;
+      y = -40;
+      break;
+    case 1: // Enter from right
+      x = viewWidth + 40;
+      y = Math.random() * viewHeight;
+      break;
+    case 2: // Enter from bottom
+      x = Math.random() * viewWidth;
+      y = viewHeight + 40;
+      break;
+    case 3: // Enter from left
+    default:
+      x = -40;
+      y = Math.random() * viewHeight;
+      break;
+  }
+
+  sheep.style.left = `${x}px`;
+  sheep.style.top = `${y}px`;
+
+  // Random speed (pixels per step) - varied speeds
+  const speed = 1 + Math.random() * 4; // 1-5 pixels per step
+  const stepInterval = 30 + Math.random() * 70; // 30-100ms per step (slower = more leisurely)
+
+  // Random initial direction (angle in radians)
+  let angle = Math.random() * Math.PI * 2;
+  let currentX = x;
+  let currentY = y;
+
+  // Track direction for flipping
+  let lastX = x;
+
+  // Wandering parameters
+  const turnRate = 0.1 + Math.random() * 0.2; // How much the sheep can turn each step
+  const wanderStrength = 0.3 + Math.random() * 0.4; // Randomness in direction changes
+
+  // Maximum time on screen (15-45 seconds)
+  const maxDuration = 15000 + Math.random() * 30000;
+  const startTime = Date.now();
+
+  const moveInterval = setInterval(() => {
+    // Check if sheep has been wandering too long
+    if (Date.now() - startTime > maxDuration) {
+      clearInterval(moveInterval);
+      sheep.remove();
+      activeSheep = activeSheep.filter(s => s !== sheep);
+      return;
+    }
+
+    // Add random wandering to direction
+    angle += (Math.random() - 0.5) * turnRate * wanderStrength;
+
+    // Occasionally make bigger direction changes
+    if (Math.random() < 0.02) {
+      angle += (Math.random() - 0.5) * Math.PI * 0.5;
+    }
+
+    // Gently steer away from edges
+    const edgeMargin = 100;
+    if (currentX < edgeMargin) angle += 0.1;
+    if (currentX > viewWidth - edgeMargin) angle -= 0.1;
+    if (currentY < edgeMargin) angle += (angle > 0 && angle < Math.PI) ? 0.1 : -0.1;
+    if (currentY > viewHeight - edgeMargin) angle += (angle > Math.PI) ? 0.1 : -0.1;
+
+    // Move in current direction
+    currentX += Math.cos(angle) * speed;
+    currentY += Math.sin(angle) * speed;
+
+    // Add slight wobble for natural walking
+    const wobbleX = (Math.random() - 0.5) * 2;
+    const wobbleY = (Math.random() - 0.5) * 2;
+
+    sheep.style.left = `${currentX + wobbleX}px`;
+    sheep.style.top = `${currentY + wobbleY}px`;
+
+    // Flip sheep based on movement direction (sheep emoji faces left by default)
+    if (currentX > lastX + 0.5) {
+      sheep.classList.add('flipped');
+    } else if (currentX < lastX - 0.5) {
+      sheep.classList.remove('flipped');
+    }
+    lastX = currentX;
+
+    // Remove if sheep wanders off screen
+    if (currentX < -60 || currentX > viewWidth + 60 ||
+        currentY < -60 || currentY > viewHeight + 60) {
+      clearInterval(moveInterval);
+      sheep.remove();
+      activeSheep = activeSheep.filter(s => s !== sheep);
+    }
+  }, stepInterval);
+
+  activeSheep.push(sheep);
+}
+
+function startRogueSheep() {
+  if (rogueSheepInterval) return;
+
+  // Spawn a sheep at random intervals (30-90 seconds)
+  const scheduleNextSheep = () => {
+    const delay = 30000 + Math.random() * 60000;
+    rogueSheepInterval = setTimeout(() => {
+      if (rogueSheepCheckbox && rogueSheepCheckbox.checked) {
+        createRogueSheep();
+        scheduleNextSheep();
+      }
+    }, delay);
+  };
+
+  // Spawn first sheep after a short delay (5-15 seconds)
+  rogueSheepInterval = setTimeout(() => {
+    if (rogueSheepCheckbox && rogueSheepCheckbox.checked) {
+      createRogueSheep();
+      scheduleNextSheep();
+    }
+  }, 5000 + Math.random() * 10000);
+}
+
+function stopRogueSheep() {
+  if (rogueSheepInterval) {
+    clearTimeout(rogueSheepInterval);
+    rogueSheepInterval = null;
+  }
+  // Remove any active sheep
+  activeSheep.forEach(sheep => sheep.remove());
+  activeSheep = [];
+}
+
+if (rogueSheepCheckbox) {
+  rogueSheepCheckbox.addEventListener('change', () => {
+    if (rogueSheepCheckbox.checked) {
+      startRogueSheep();
+    } else {
+      stopRogueSheep();
+    }
+  });
+}
+
 // Initialize app with async state loading
 if (shouldAutoInit) {
   (async () => {

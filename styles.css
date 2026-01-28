@@ -649,3 +649,31 @@ input[data-question-type-percentage]:invalid {
   padding: 2rem 1rem;
   color: #666;
 }
+
+/* Rogue Sheep Easter Egg */
+.rogue-sheep-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 20px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  user-select: none;
+}
+
+.rogue-sheep-label input[type="checkbox"] {
+  cursor: pointer;
+}
+
+.rogue-sheep {
+  position: fixed;
+  font-size: 32px;
+  z-index: 9999;
+  pointer-events: none;
+  transition: transform 0.1s ease;
+}
+
+.rogue-sheep.flipped {
+  transform: scaleX(-1);
+}
