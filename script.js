@@ -5657,8 +5657,11 @@ function createRogueSheep() {
   sheep.setAttribute('aria-hidden', 'true');
   document.body.appendChild(sheep);
 
-  const viewWidth = window.innerWidth;
-  const viewHeight = window.innerHeight;
+  // Use visualViewport for accurate dimensions on iOS (accounts for address bar)
+  const viewWidth = window.visualViewport ? window.visualViewport.width : window.innerWidth;
+  const viewHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  // Add bottom padding for iOS safe area (address bar)
+  const safeAreaBottom = 50; // Extra padding to stay above iOS address bar
 
   // Random starting position (off-screen)
   const entrySide = Math.floor(Math.random() * 4); // 0: top, 1: right, 2: bottom, 3: left
@@ -5691,9 +5694,9 @@ function createRogueSheep() {
   const baseSpeed = 1.5 + Math.random() * 2; // 1.5-3.5 pixels per step
   const stepInterval = 40; // Fixed interval for consistent behavior
   
-  // Initial direction toward center
+  // Initial direction toward center (accounting for safe area at bottom)
   const centerX = viewWidth / 2;
-  const centerY = viewHeight / 2;
+  const centerY = (viewHeight - safeAreaBottom) / 2;
   let angle = Math.atan2(centerY - y, centerX - x) + (Math.random() - 0.5) * Math.PI * 0.3;
   let currentX = x;
   let currentY = y;
@@ -5768,7 +5771,7 @@ function createRogueSheep() {
       }
     } else {
       // Performing action (weight 1, half odds) - only if on screen
-      if (currentX > 50 && currentX < viewWidth - 50 && currentY > 50 && currentY < viewHeight - 50) {
+      if (currentX > 50 && currentX < viewWidth - 50 && currentY > 50 && currentY < viewHeight - safeAreaBottom - 50) {
         currentBehavior = 'performing';
         isPaused = true;
         const action = pickRandomAction();
@@ -5785,7 +5788,7 @@ function createRogueSheep() {
         // Not on screen, fall back to purposeful
         currentBehavior = 'purposeful';
         targetX = 100 + Math.random() * (viewWidth - 200);
-        targetY = 100 + Math.random() * (viewHeight - 200);
+        targetY = 100 + Math.random() * (viewHeight - safeAreaBottom - 200);
       }
     }
     
@@ -5903,7 +5906,7 @@ function createRogueSheep() {
       if (currentX < edgeMargin) edgePush = Math.max(edgePush, (edgeMargin - currentX) / edgeMargin);
       if (currentX > viewWidth - edgeMargin) edgePush = Math.max(edgePush, (currentX - (viewWidth - edgeMargin)) / edgeMargin);
       if (currentY < edgeMargin) edgePush = Math.max(edgePush, (edgeMargin - currentY) / edgeMargin);
-      if (currentY > viewHeight - edgeMargin) edgePush = Math.max(edgePush, (currentY - (viewHeight - edgeMargin)) / edgeMargin);
+      if (currentY > viewHeight - safeAreaBottom - edgeMargin) edgePush = Math.max(edgePush, (currentY - (viewHeight - safeAreaBottom - edgeMargin)) / edgeMargin);
       
       if (edgePush > 0) {
         const angleToCenter = Math.atan2(centerY - currentY, centerX - currentX);
