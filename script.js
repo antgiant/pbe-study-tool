@@ -4132,9 +4132,7 @@ const sheepActions = [
   { name: 'detective', weight: 1 },
   { name: 'astronaut', weight: 1 },
   { name: 'doctor', weight: 1 },
-  { name: 'pirate', weight: 1 },
-  { name: 'wizard', weight: 1 },
-  { name: 'superhero', weight: 1 },
+  { name: 'praying', weight: 1 },
   // Nature/Animals
   { name: 'bee', weight: 1 },
   { name: 'birdWatching', weight: 1 },
@@ -4890,46 +4888,17 @@ function performSheepAction(sheep, actionName, isBlackSheep, currentX, currentY)
       }, 650);
       break;
     }
-    case 'pirate': {
-      createSheepParticle(x, y - 15, '🏴‍☠️');
-      const pirateEmojis = ['⚓', '🗺️', '💎', '🤜', '✨'];
-      let pirateCount = 0;
-      const pirateInterval = setInterval(() => {
-        if (pirateCount < 5) {
-          createSheepParticle(x + (Math.random() - 0.5) * 30, y, pirateEmojis[Math.floor(Math.random() * pirateEmojis.length)]);
-          pirateCount++;
+    case 'praying': {
+      const prayerEmojis = ['🙏', '✨', '👼', '❤️', '🕊️', '✝️'];
+      let prayerCount = 0;
+      const prayerInterval = setInterval(() => {
+        if (prayerCount < 5) {
+          createSheepParticle(x, y, prayerEmojis[Math.floor(Math.random() * prayerEmojis.length)]);
+          prayerCount++;
         } else {
-          clearInterval(pirateInterval);
+          clearInterval(prayerInterval);
         }
-      }, 550);
-      break;
-    }
-    case 'wizard': {
-      createSheepParticle(x, y - 15, '🧙‍♂️');
-      const wizardEmojis = ['🪄', '📜', '✨', '🌟', '🔮'];
-      let wizardCount = 0;
-      const wizardInterval = setInterval(() => {
-        if (wizardCount < 5) {
-          createSheepParticle(x + (Math.random() - 0.5) * 30, y, wizardEmojis[Math.floor(Math.random() * wizardEmojis.length)]);
-          wizardCount++;
-        } else {
-          clearInterval(wizardInterval);
-        }
-      }, 500);
-      break;
-    }
-    case 'superhero': {
-      createSheepParticle(x, y - 15, '🦸');
-      const heroEmojis = ['💥', '⚡', '✨', '💪', '🌟'];
-      let heroCount = 0;
-      const heroInterval = setInterval(() => {
-        if (heroCount < 5) {
-          createSheepParticle(x + (Math.random() - 0.5) * 35, y, heroEmojis[Math.floor(Math.random() * heroEmojis.length)]);
-          heroCount++;
-        } else {
-          clearInterval(heroInterval);
-        }
-      }, 450);
+      }, 650);
       break;
     }
     // Nature/Animals
