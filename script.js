@@ -4152,6 +4152,25 @@ const sheepActions = [
   { name: 'treasure', weight: 1 },
   { name: 'timeTravel', weight: 1 },
   { name: 'clone', weight: 1 },
+  // Beach/Water
+  { name: 'islandDrink', weight: 1 },
+  { name: 'islandCoconut', weight: 1 },
+  { name: 'islandEscape', weight: 1 },
+  { name: 'surf', weight: 1 },
+  // Transportation
+  { name: 'car', weight: 1 },
+  { name: 'bus', weight: 1 },
+  { name: 'train', weight: 1 },
+  { name: 'airplane', weight: 1 },
+  { name: 'bicycle', weight: 1 },
+  { name: 'motorcycle', weight: 1 },
+  { name: 'boat', weight: 1 },
+  { name: 'helicopter', weight: 1 },
+  { name: 'hotAirBalloon', weight: 1 },
+  { name: 'skateboard', weight: 1 },
+  { name: 'scooter', weight: 1 },
+  { name: 'tractor', weight: 1 },
+  { name: 'rocket', weight: 1 },
 ];
 
 function createSheepParticle(x, y, emoji, type = 'rise') {
@@ -5119,6 +5138,257 @@ function performSheepAction(sheep, actionName, isBlackSheep, currentX, currentY)
       }, 500);
       break;
     }
+    // Beach/Water actions
+    case 'islandDrink': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 30 : -30), y, '🏖️');
+      setTimeout(() => createSheepParticle(x, y, '🏊'), 1000);
+      setTimeout(() => {
+        createSheepParticle(x + (sheep.classList.contains('flipped') ? 35 : -35), y, '🌴');
+        createSheepParticle(x, y, '😌');
+      }, 2500);
+      setTimeout(() => {
+        createSheepParticle(x + (sheep.classList.contains('flipped') ? 20 : -20), y, '🍹');
+        createSheepParticle(x, y, '😋');
+        createSheepParticle(x, y - 10, '✨');
+      }, 4000);
+      break;
+    }
+    case 'islandCoconut': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 30 : -30), y, '🏖️');
+      setTimeout(() => createSheepParticle(x, y, '🏊'), 1000);
+      setTimeout(() => {
+        createSheepParticle(x + (sheep.classList.contains('flipped') ? 35 : -35), y, '🌴');
+        createSheepParticle(x, y, '😌');
+      }, 2500);
+      setTimeout(() => {
+        createSheepParticle(x, y - 25, '🥥', 'fall');
+      }, 4000);
+      setTimeout(() => {
+        createSheepParticle(x, y, '💥');
+        createSheepParticle(x, y, '😵');
+        createSheepParticle(x, y - 10, '⭐');
+      }, 4500);
+      break;
+    }
+    case 'islandEscape': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? -30 : 30), y, '🏖️');
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? -35 : 35), y, '🌴');
+      setTimeout(() => {
+        createSheepParticle(x, y, '🏊');
+        createSheepParticle(x, y, '💨');
+      }, 1500);
+      setTimeout(() => {
+        createSheepParticle(x, y, '🌊');
+        createSheepParticle(x + (sheep.classList.contains('flipped') ? 20 : -20), y, '😄');
+      }, 3000);
+      setTimeout(() => {
+        createSheepParticle(x, y, '✨');
+        createSheepParticle(x, y, '🎉');
+      }, 4500);
+      break;
+    }
+    case 'surf': {
+      createSheepParticle(x, y + 10, '🏄');
+      const surfEmojis = ['🌊', '✨', '🤙', '😎'];
+      let surfCount = 0;
+      const surfInterval = setInterval(() => {
+        if (surfCount < 6) {
+          createSheepParticle(x + (Math.random() - 0.5) * 40, y + 15, surfEmojis[Math.floor(Math.random() * surfEmojis.length)]);
+          surfCount++;
+        } else {
+          clearInterval(surfInterval);
+        }
+      }, 500);
+      break;
+    }
+    // Transportation actions
+    case 'car': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 20 : -20), y + 5, '🚗');
+      const carEmojis = ['💨', '✨', '🏎️', '🚕'];
+      let carCount = 0;
+      const carInterval = setInterval(() => {
+        if (carCount < 4) {
+          createSheepParticle(x + (sheep.classList.contains('flipped') ? -15 : 15), y + 10, carEmojis[Math.floor(Math.random() * carEmojis.length)]);
+          carCount++;
+        } else {
+          clearInterval(carInterval);
+        }
+      }, 600);
+      break;
+    }
+    case 'bus': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 25 : -25), y + 5, '🚌');
+      const busEmojis = ['🚏', '💨', '✨', '👋'];
+      let busCount = 0;
+      const busInterval = setInterval(() => {
+        if (busCount < 4) {
+          createSheepParticle(x, y, busEmojis[busCount]);
+          busCount++;
+        } else {
+          clearInterval(busInterval);
+        }
+      }, 700);
+      break;
+    }
+    case 'train': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 25 : -25), y + 5, '🚂');
+      const trainEmojis = ['🚃', '🚃', '💨', '✨'];
+      let trainCount = 0;
+      const trainInterval = setInterval(() => {
+        if (trainCount < 4) {
+          createSheepParticle(x + (sheep.classList.contains('flipped') ? 25 + trainCount * 15 : -25 - trainCount * 15), y + 5, trainEmojis[trainCount]);
+          trainCount++;
+        } else {
+          clearInterval(trainInterval);
+        }
+      }, 400);
+      break;
+    }
+    case 'airplane': {
+      createSheepParticle(x, y - 20, '✈️');
+      const planeEmojis = ['☁️', '✨', '🌟', '💨'];
+      let planeCount = 0;
+      const planeInterval = setInterval(() => {
+        if (planeCount < 5) {
+          createSheepParticle(x + (Math.random() - 0.5) * 50, y - 25, planeEmojis[Math.floor(Math.random() * planeEmojis.length)]);
+          planeCount++;
+        } else {
+          clearInterval(planeInterval);
+        }
+      }, 500);
+      break;
+    }
+    case 'bicycle': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 15 : -15), y + 8, '🚲');
+      const bikeEmojis = ['💨', '✨', '💪', '😄'];
+      let bikeCount = 0;
+      const bikeInterval = setInterval(() => {
+        if (bikeCount < 4) {
+          createSheepParticle(x, y, bikeEmojis[bikeCount]);
+          bikeCount++;
+        } else {
+          clearInterval(bikeInterval);
+        }
+      }, 600);
+      break;
+    }
+    case 'motorcycle': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 20 : -20), y + 5, '🏍️');
+      const motoEmojis = ['💨', '🔥', '✨', '😎'];
+      let motoCount = 0;
+      const motoInterval = setInterval(() => {
+        if (motoCount < 4) {
+          createSheepParticle(x + (sheep.classList.contains('flipped') ? -15 : 15), y + 5, motoEmojis[Math.floor(Math.random() * motoEmojis.length)]);
+          motoCount++;
+        } else {
+          clearInterval(motoInterval);
+        }
+      }, 500);
+      break;
+    }
+    case 'boat': {
+      createSheepParticle(x, y + 10, '⛵');
+      const boatEmojis = ['🌊', '✨', '🐟', '🦐'];
+      let boatCount = 0;
+      const boatInterval = setInterval(() => {
+        if (boatCount < 5) {
+          createSheepParticle(x + (Math.random() - 0.5) * 40, y + 15, boatEmojis[Math.floor(Math.random() * boatEmojis.length)]);
+          boatCount++;
+        } else {
+          clearInterval(boatInterval);
+        }
+      }, 550);
+      break;
+    }
+    case 'helicopter': {
+      createSheepParticle(x, y - 20, '🚁');
+      const heliEmojis = ['💨', '✨', '🌟'];
+      let heliCount = 0;
+      const heliInterval = setInterval(() => {
+        if (heliCount < 5) {
+          createSheepParticle(x + (Math.random() - 0.5) * 30, y - 15, heliEmojis[Math.floor(Math.random() * heliEmojis.length)]);
+          heliCount++;
+        } else {
+          clearInterval(heliInterval);
+        }
+      }, 450);
+      break;
+    }
+    case 'hotAirBalloon': {
+      createSheepParticle(x, y - 25, '🎈');
+      setTimeout(() => createSheepParticle(x, y - 30, '🎈'), 800);
+      setTimeout(() => {
+        createSheepParticle(x, y - 35, '🌈');
+        createSheepParticle(x, y, '😍');
+      }, 1600);
+      const balloonEmojis = ['✨', '☁️', '🌞'];
+      let balloonCount = 0;
+      const balloonInterval = setInterval(() => {
+        if (balloonCount < 4) {
+          createSheepParticle(x + (Math.random() - 0.5) * 40, y - 20, balloonEmojis[Math.floor(Math.random() * balloonEmojis.length)]);
+          balloonCount++;
+        } else {
+          clearInterval(balloonInterval);
+        }
+      }, 700);
+      break;
+    }
+    case 'skateboard': {
+      createSheepParticle(x, y + 12, '🛹');
+      const skateEmojis = ['🤙', '✨', '💪', '😎'];
+      let skateCount = 0;
+      const skateInterval = setInterval(() => {
+        if (skateCount < 4) {
+          createSheepParticle(x, y, skateEmojis[skateCount]);
+          skateCount++;
+        } else {
+          clearInterval(skateInterval);
+        }
+      }, 600);
+      break;
+    }
+    case 'scooter': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 15 : -15), y + 8, '🛴');
+      const scooterEmojis = ['💨', '✨', '😄', '🍃'];
+      let scooterCount = 0;
+      const scooterInterval = setInterval(() => {
+        if (scooterCount < 4) {
+          createSheepParticle(x + (sheep.classList.contains('flipped') ? -10 : 10), y + 5, scooterEmojis[Math.floor(Math.random() * scooterEmojis.length)]);
+          scooterCount++;
+        } else {
+          clearInterval(scooterInterval);
+        }
+      }, 550);
+      break;
+    }
+    case 'tractor': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 25 : -25), y + 5, '🚜');
+      const tractorEmojis = ['🌾', '🌻', '💨', '✨'];
+      let tractorCount = 0;
+      const tractorInterval = setInterval(() => {
+        if (tractorCount < 4) {
+          createSheepParticle(x + (Math.random() - 0.5) * 30, y + 10, tractorEmojis[Math.floor(Math.random() * tractorEmojis.length)]);
+          tractorCount++;
+        } else {
+          clearInterval(tractorInterval);
+        }
+      }, 600);
+      break;
+    }
+    case 'rocket': {
+      createSheepParticle(x, y - 15, '🚀');
+      const rocketEmojis = ['🔥', '✨', '🌟', '💫'];
+      let rocketCount = 0;
+      const rocketInterval = setInterval(() => {
+        if (rocketCount < 6) {
+          createSheepParticle(x + (Math.random() - 0.5) * 20, y + 10, rocketEmojis[Math.floor(Math.random() * rocketEmojis.length)]);
+          rocketCount++;
+        } else {
+          clearInterval(rocketInterval);
+        }
+      }, 400);
+      break;
+    }
   }
 }
 
@@ -5219,8 +5489,8 @@ function createRogueSheep() {
         const action = pickRandomAction();
         performSheepAction(sheep, action, isBlackSheep, currentX, currentY);
         
-        // Resume after random duration (3-8 seconds)
-        const pauseDuration = 3000 + Math.random() * 5000;
+        // Resume after random duration (10-15 seconds)
+        const pauseDuration = 10000 + Math.random() * 5000;
         setTimeout(() => {
           isPaused = false;
         }, pauseDuration);
