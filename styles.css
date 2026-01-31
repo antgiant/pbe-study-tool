@@ -686,3 +686,100 @@ input[data-question-type-percentage]:invalid {
   transform: scaleX(-1);
   filter: brightness(0.2) saturate(0.5);
 }
+
+.rogue-sheep.rained-on {
+  filter: hue-rotate(180deg) saturate(1.5);
+}
+
+.rogue-sheep.black-sheep.rained-on {
+  filter: brightness(0.2) saturate(0.5) hue-rotate(180deg);
+}
+
+.rogue-sheep.jumping {
+  animation: sheep-jump 0.6s ease-out;
+}
+
+@keyframes sheep-jump {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-30px); }
+  100% { transform: translateY(0); }
+}
+
+.rogue-sheep.flipped.jumping {
+  animation: sheep-jump-flipped 0.6s ease-out;
+}
+
+@keyframes sheep-jump-flipped {
+  0% { transform: scaleX(-1) translateY(0); }
+  50% { transform: scaleX(-1) translateY(-30px); }
+  100% { transform: scaleX(-1) translateY(0); }
+}
+
+.sheep-particle {
+  position: fixed;
+  font-size: 16px;
+  z-index: 9998;
+  pointer-events: none;
+  animation: particle-rise 2s ease-out forwards;
+}
+
+.sheep-particle.falling {
+  animation: particle-fall 1.5s ease-in forwards;
+}
+
+.sheep-particle.eating {
+  animation: particle-eat 1s ease-in-out forwards;
+  font-size: 20px;
+}
+
+.sheep-jump-obstacle {
+  position: fixed;
+  font-size: 24px;
+  z-index: 9997;
+  pointer-events: none;
+  animation: obstacle-appear 5s ease-in-out forwards;
+}
+
+@keyframes particle-rise {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-40px) scale(0.6);
+  }
+}
+
+@keyframes particle-fall {
+  0% {
+    opacity: 0.8;
+    transform: translateY(-30px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@keyframes particle-eat {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-5px) scale(0.8);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(5px) scale(0.3);
+  }
+}
+
+@keyframes obstacle-appear {
+  0% { opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { opacity: 0; }
+}

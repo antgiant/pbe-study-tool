@@ -4069,13 +4069,1108 @@ const rogueSheepCheckbox = document.getElementById('rogue-sheep');
 let rogueSheepInterval = null;
 let activeSheep = [];
 
+// Sheep action definitions
+const sheepActions = [
+  { name: 'sing', weight: 1 },
+  { name: 'eat', weight: 1 },
+  { name: 'jump', weight: 1 },
+  { name: 'sleep', weight: 1 },
+  { name: 'love', weight: 1 },
+  { name: 'rain', weight: 1 },
+  { name: 'think', weight: 1 },
+  { name: 'sparkle', weight: 1 },
+  { name: 'sneeze', weight: 1 },
+  { name: 'baa', weight: 1 },
+  { name: 'read', weight: 2 },
+  { name: 'church', weight: 1 },
+  { name: 'glasses', weight: 1 },
+  // Nature/Weather
+  { name: 'sunny', weight: 1 },
+  { name: 'snowy', weight: 1 },
+  { name: 'windy', weight: 1 },
+  { name: 'rainbow', weight: 1 },
+  // Activities
+  { name: 'dance', weight: 1 },
+  { name: 'exercise', weight: 1 },
+  { name: 'paint', weight: 1 },
+  { name: 'garden', weight: 1 },
+  { name: 'cook', weight: 1 },
+  { name: 'fish', weight: 1 },
+  // Social/Emotional
+  { name: 'wave', weight: 1 },
+  { name: 'celebrate', weight: 1 },
+  { name: 'cry', weight: 1 },
+  { name: 'laugh', weight: 1 },
+  { name: 'scared', weight: 1 },
+  { name: 'angry', weight: 1 },
+  // Whimsical
+  { name: 'dream', weight: 1 },
+  { name: 'coffee', weight: 1 },
+  { name: 'photo', weight: 1 },
+  { name: 'music', weight: 1 },
+  { name: 'butterfly', weight: 1 },
+  { name: 'countingSheep', weight: 1 },
+  { name: 'crown', weight: 1 },
+  { name: 'birthday', weight: 1 },
+  // Sports/Games
+  { name: 'soccer', weight: 1 },
+  { name: 'basketball', weight: 1 },
+  { name: 'golf', weight: 1 },
+  { name: 'tennis', weight: 1 },
+  { name: 'bowling', weight: 1 },
+  { name: 'videoGames', weight: 1 },
+  // Food/Drink
+  { name: 'pizza', weight: 1 },
+  { name: 'iceCream', weight: 1 },
+  { name: 'picnic', weight: 1 },
+  { name: 'bbq', weight: 1 },
+  // Seasonal/Holiday
+  { name: 'christmas', weight: 1 },
+  { name: 'valentine', weight: 1 },
+  { name: 'fireworks', weight: 1 },
+  // Occupations
+  { name: 'detective', weight: 1 },
+  { name: 'astronaut', weight: 1 },
+  { name: 'doctor', weight: 1 },
+  { name: 'pirate', weight: 1 },
+  { name: 'wizard', weight: 1 },
+  { name: 'superhero', weight: 1 },
+  // Nature/Animals
+  { name: 'bee', weight: 1 },
+  { name: 'birdWatching', weight: 1 },
+  { name: 'frog', weight: 1 },
+  { name: 'ladybug', weight: 1 },
+  // Tech/Modern
+  { name: 'texting', weight: 1 },
+  { name: 'streaming', weight: 1 },
+  { name: 'working', weight: 1 },
+  { name: 'podcast', weight: 1 },
+  // Misc Fun
+  { name: 'balloon', weight: 1 },
+  { name: 'dizzy', weight: 1 },
+  { name: 'hiccup', weight: 1 },
+  { name: 'yawn', weight: 1 },
+  { name: 'whistle', weight: 1 },
+  { name: 'treasure', weight: 1 },
+  { name: 'timeTravel', weight: 1 },
+  { name: 'clone', weight: 1 },
+];
+
+function createSheepParticle(x, y, emoji, type = 'rise') {
+  const particle = document.createElement('div');
+  particle.className = 'sheep-particle' + (type === 'fall' ? ' falling' : type === 'eat' ? ' eating' : '');
+  particle.textContent = emoji;
+  particle.style.left = `${x + (Math.random() - 0.5) * 20}px`;
+  particle.style.top = `${y - 20}px`;
+  particle.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(particle);
+  
+  setTimeout(() => particle.remove(), type === 'fall' ? 1500 : type === 'eat' ? 1000 : 2000);
+}
+
+function performSheepAction(sheep, actionName, isBlackSheep, currentX, currentY) {
+  const x = currentX;
+  const y = currentY;
+  
+  switch (actionName) {
+    case 'sing': {
+      // Black sheep sings different notes
+      const notes = isBlackSheep ? ['🎶', '🎵', '🎶', '🎵'] : ['♩', '♪', '♫', '♬'];
+      let noteIndex = 0;
+      const singInterval = setInterval(() => {
+        if (noteIndex < 6) {
+          createSheepParticle(x, y, notes[noteIndex % notes.length]);
+          noteIndex++;
+        } else {
+          clearInterval(singInterval);
+        }
+      }, 600);
+      break;
+    }
+    case 'eat': {
+      const foods = ['🌾', '🌿', '🍀', '🌱', '☘️'];
+      let eatCount = 0;
+      const eatInterval = setInterval(() => {
+        if (eatCount < 4) {
+          createSheepParticle(x + 15, y + 10, foods[Math.floor(Math.random() * foods.length)], 'eat');
+          eatCount++;
+        } else {
+          clearInterval(eatInterval);
+        }
+      }, 800);
+      break;
+    }
+    case 'jump': {
+      const obstacles = ['🚧', '🪨', '🪵', '🌵', '📦', '🧱'];
+      const obstacle = document.createElement('div');
+      obstacle.className = 'sheep-jump-obstacle';
+      obstacle.textContent = obstacles[Math.floor(Math.random() * obstacles.length)];
+      obstacle.style.left = `${x + (sheep.classList.contains('flipped') ? 40 : -40)}px`;
+      obstacle.style.top = `${y + 10}px`;
+      obstacle.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(obstacle);
+      
+      // Jump after a moment
+      setTimeout(() => {
+        sheep.classList.add('jumping');
+        setTimeout(() => sheep.classList.remove('jumping'), 600);
+      }, 1500);
+      
+      setTimeout(() => obstacle.remove(), 5000);
+      break;
+    }
+    case 'sleep': {
+      let zzCount = 0;
+      const sleepInterval = setInterval(() => {
+        if (zzCount < 5) {
+          createSheepParticle(x, y, '💤');
+          zzCount++;
+        } else {
+          clearInterval(sleepInterval);
+        }
+      }, 800);
+      break;
+    }
+    case 'love': {
+      const hearts = ['💖', '💕', '💗', '❤️', '💓'];
+      let heartCount = 0;
+      const loveInterval = setInterval(() => {
+        if (heartCount < 5) {
+          createSheepParticle(x, y, hearts[Math.floor(Math.random() * hearts.length)]);
+          heartCount++;
+        } else {
+          clearInterval(loveInterval);
+        }
+      }, 700);
+      break;
+    }
+    case 'rain': {
+      sheep.classList.add('rained-on');
+      let dropCount = 0;
+      const rainInterval = setInterval(() => {
+        if (dropCount < 15) {
+          createSheepParticle(x + (Math.random() - 0.5) * 30, y - 30, '💧', 'fall');
+          dropCount++;
+        } else {
+          clearInterval(rainInterval);
+        }
+      }, 250);
+      // Remove rain effect after action completes
+      setTimeout(() => sheep.classList.remove('rained-on'), 5500);
+      break;
+    }
+    case 'think': {
+      const thoughts = ['💭', '❓', '💡', '🤔', '❔'];
+      let thoughtCount = 0;
+      const thinkInterval = setInterval(() => {
+        if (thoughtCount < 3) {
+          createSheepParticle(x, y, thoughts[Math.floor(Math.random() * thoughts.length)]);
+          thoughtCount++;
+        } else {
+          clearInterval(thinkInterval);
+        }
+      }, 1200);
+      break;
+    }
+    case 'sparkle': {
+      const sparkles = ['✨', '⭐', '🌟', '💫'];
+      let sparkleCount = 0;
+      const sparkleInterval = setInterval(() => {
+        if (sparkleCount < 8) {
+          createSheepParticle(
+            x + (Math.random() - 0.5) * 40,
+            y + (Math.random() - 0.5) * 20,
+            sparkles[Math.floor(Math.random() * sparkles.length)]
+          );
+          sparkleCount++;
+        } else {
+          clearInterval(sparkleInterval);
+        }
+      }, 400);
+      break;
+    }
+    case 'sneeze': {
+      setTimeout(() => {
+        createSheepParticle(x + (sheep.classList.contains('flipped') ? 20 : -20), y, '💨');
+        createSheepParticle(x + (sheep.classList.contains('flipped') ? 30 : -30), y + 5, '💨');
+        createSheepParticle(x + (sheep.classList.contains('flipped') ? 25 : -25), y - 5, '✨');
+      }, 1500);
+      break;
+    }
+    case 'baa': {
+      const speechBubbles = ['🗯️', '💬'];
+      let baaCount = 0;
+      const baaInterval = setInterval(() => {
+        if (baaCount < 3) {
+          createSheepParticle(x, y, speechBubbles[baaCount % 2]);
+          baaCount++;
+        } else {
+          clearInterval(baaInterval);
+        }
+      }, 1000);
+      break;
+    }
+    case 'read': {
+      // Show book and reading particles
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 15 : -15), y + 5, '📖', 'eat');
+      const readEmojis = ['📚', '📕', '📗', '📘', '📙', '✨', '💭'];
+      let readCount = 0;
+      const readInterval = setInterval(() => {
+        if (readCount < 6) {
+          createSheepParticle(x, y, readEmojis[Math.floor(Math.random() * readEmojis.length)]);
+          readCount++;
+        } else {
+          clearInterval(readInterval);
+        }
+      }, 600);
+      break;
+    }
+    case 'church': {
+      // Going to church - show church and holy symbols
+      createSheepParticle(x, y - 10, '⛪');
+      const holySymbols = ['✝️', '🙏', '👼', '✨', '🕊️', '📿'];
+      let churchCount = 0;
+      const churchInterval = setInterval(() => {
+        if (churchCount < 5) {
+          createSheepParticle(x, y, holySymbols[Math.floor(Math.random() * holySymbols.length)]);
+          churchCount++;
+        } else {
+          clearInterval(churchInterval);
+        }
+      }, 700);
+      break;
+    }
+    case 'glasses': {
+      // Put on glasses - show glasses appearing
+      const glassesEmojis = ['👓', '🤓', '🧐', '✨'];
+      setTimeout(() => {
+        createSheepParticle(x, y - 5, '👓');
+      }, 500);
+      setTimeout(() => {
+        createSheepParticle(x, y, '✨');
+        createSheepParticle(x - 10, y, '✨');
+        createSheepParticle(x + 10, y, '✨');
+      }, 1500);
+      setTimeout(() => {
+        createSheepParticle(x, y, '🤓');
+      }, 2500);
+      break;
+    }
+    // Nature/Weather actions
+    case 'sunny': {
+      createSheepParticle(x, y - 30, '☀️');
+      const sunnyEmojis = ['😎', '✨', '🌞', '💦'];
+      let sunnyCount = 0;
+      const sunnyInterval = setInterval(() => {
+        if (sunnyCount < 5) {
+          createSheepParticle(x, y, sunnyEmojis[Math.floor(Math.random() * sunnyEmojis.length)]);
+          sunnyCount++;
+        } else {
+          clearInterval(sunnyInterval);
+        }
+      }, 600);
+      break;
+    }
+    case 'snowy': {
+      const snowEmojis = ['❄️', '☃️', '🌨️', '🥶'];
+      let snowCount = 0;
+      const snowInterval = setInterval(() => {
+        if (snowCount < 12) {
+          createSheepParticle(x + (Math.random() - 0.5) * 40, y - 20, '❄️', 'fall');
+          snowCount++;
+        } else {
+          clearInterval(snowInterval);
+        }
+      }, 300);
+      setTimeout(() => createSheepParticle(x, y, '🥶'), 2000);
+      break;
+    }
+    case 'windy': {
+      const windEmojis = ['💨', '🍃', '🍂', '🍁'];
+      let windCount = 0;
+      const windInterval = setInterval(() => {
+        if (windCount < 8) {
+          createSheepParticle(x + (sheep.classList.contains('flipped') ? -20 : 20), y, windEmojis[Math.floor(Math.random() * windEmojis.length)]);
+          windCount++;
+        } else {
+          clearInterval(windInterval);
+        }
+      }, 350);
+      break;
+    }
+    case 'rainbow': {
+      createSheepParticle(x, y - 30, '🌈');
+      const rainbowEmojis = ['✨', '🌟', '💖', '🤩'];
+      let rainbowCount = 0;
+      const rainbowInterval = setInterval(() => {
+        if (rainbowCount < 5) {
+          createSheepParticle(x + (Math.random() - 0.5) * 30, y, rainbowEmojis[Math.floor(Math.random() * rainbowEmojis.length)]);
+          rainbowCount++;
+        } else {
+          clearInterval(rainbowInterval);
+        }
+      }, 500);
+      break;
+    }
+    // Activity actions
+    case 'dance': {
+      const danceEmojis = ['💃', '🕺', '🎵', '🎶', '✨'];
+      let danceCount = 0;
+      const danceInterval = setInterval(() => {
+        if (danceCount < 8) {
+          createSheepParticle(x + (Math.random() - 0.5) * 30, y + (Math.random() - 0.5) * 20, danceEmojis[Math.floor(Math.random() * danceEmojis.length)]);
+          danceCount++;
+        } else {
+          clearInterval(danceInterval);
+        }
+      }, 400);
+      break;
+    }
+    case 'exercise': {
+      const exerciseEmojis = ['💪', '🏃‍♂️', '🩽', '😤', '💦'];
+      let exerciseCount = 0;
+      const exerciseInterval = setInterval(() => {
+        if (exerciseCount < 6) {
+          createSheepParticle(x, y, exerciseEmojis[Math.floor(Math.random() * exerciseEmojis.length)]);
+          exerciseCount++;
+        } else {
+          clearInterval(exerciseInterval);
+        }
+      }, 500);
+      break;
+    }
+    case 'paint': {
+      createSheepParticle(x + 15, y, '🎨');
+      const paintEmojis = ['🖌️', '🟥', '🟧', '🟦', '🟩', '🟪', '✨'];
+      let paintCount = 0;
+      const paintInterval = setInterval(() => {
+        if (paintCount < 6) {
+          createSheepParticle(x + (Math.random() - 0.5) * 40, y + (Math.random() - 0.5) * 30, paintEmojis[Math.floor(Math.random() * paintEmojis.length)]);
+          paintCount++;
+        } else {
+          clearInterval(paintInterval);
+        }
+      }, 450);
+      break;
+    }
+    case 'garden': {
+      const gardenEmojis = ['🌷', '🌻', '🌹', '🌺', '🌼', '🌱'];
+      let gardenCount = 0;
+      const gardenInterval = setInterval(() => {
+        if (gardenCount < 5) {
+          createSheepParticle(x + (Math.random() - 0.5) * 30, y + 10, gardenEmojis[Math.floor(Math.random() * gardenEmojis.length)], 'eat');
+          gardenCount++;
+        } else {
+          clearInterval(gardenInterval);
+        }
+      }, 600);
+      break;
+    }
+    case 'cook': {
+      createSheepParticle(x, y + 5, '🍳');
+      const cookEmojis = ['👨‍🍳', '🔥', '✨', '💨', '🧂'];
+      let cookCount = 0;
+      const cookInterval = setInterval(() => {
+        if (cookCount < 5) {
+          createSheepParticle(x, y, cookEmojis[Math.floor(Math.random() * cookEmojis.length)]);
+          cookCount++;
+        } else {
+          clearInterval(cookInterval);
+        }
+      }, 550);
+      break;
+    }
+    case 'fish': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 25 : -25), y + 15, '🎣');
+      setTimeout(() => {
+        createSheepParticle(x + (sheep.classList.contains('flipped') ? 30 : -30), y + 10, '🐟');
+        createSheepParticle(x, y, '🎉');
+      }, 2500);
+      break;
+    }
+    // Social/Emotional actions
+    case 'wave': {
+      const waveEmojis = ['👋', '😊', '✨'];
+      let waveCount = 0;
+      const waveInterval = setInterval(() => {
+        if (waveCount < 4) {
+          createSheepParticle(x, y, waveEmojis[waveCount % waveEmojis.length]);
+          waveCount++;
+        } else {
+          clearInterval(waveInterval);
+        }
+      }, 600);
+      break;
+    }
+    case 'celebrate': {
+      const celebrateEmojis = ['🎉', '🥳', '🎊', '🎈', '✨', '🎆'];
+      let celebrateCount = 0;
+      const celebrateInterval = setInterval(() => {
+        if (celebrateCount < 8) {
+          createSheepParticle(x + (Math.random() - 0.5) * 40, y + (Math.random() - 0.5) * 20, celebrateEmojis[Math.floor(Math.random() * celebrateEmojis.length)]);
+          celebrateCount++;
+        } else {
+          clearInterval(celebrateInterval);
+        }
+      }, 350);
+      break;
+    }
+    case 'cry': {
+      const cryEmojis = ['😢', '💧', '😭'];
+      let cryCount = 0;
+      const cryInterval = setInterval(() => {
+        if (cryCount < 6) {
+          createSheepParticle(x + (Math.random() - 0.5) * 15, y, cryEmojis[Math.floor(Math.random() * cryEmojis.length)], 'fall');
+          cryCount++;
+        } else {
+          clearInterval(cryInterval);
+        }
+      }, 500);
+      break;
+    }
+    case 'laugh': {
+      const laughEmojis = ['😂', '🤣', '😄', '😆'];
+      let laughCount = 0;
+      const laughInterval = setInterval(() => {
+        if (laughCount < 5) {
+          createSheepParticle(x, y, laughEmojis[Math.floor(Math.random() * laughEmojis.length)]);
+          laughCount++;
+        } else {
+          clearInterval(laughInterval);
+        }
+      }, 500);
+      break;
+    }
+    case 'scared': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? -30 : 30), y, '👻');
+      const scaredEmojis = ['😱', '😨', '💦', '❗'];
+      let scaredCount = 0;
+      const scaredInterval = setInterval(() => {
+        if (scaredCount < 4) {
+          createSheepParticle(x, y, scaredEmojis[Math.floor(Math.random() * scaredEmojis.length)]);
+          scaredCount++;
+        } else {
+          clearInterval(scaredInterval);
+        }
+      }, 400);
+      break;
+    }
+    case 'angry': {
+      const angryEmojis = ['😤', '💢', '😡', '💯'];
+      let angryCount = 0;
+      const angryInterval = setInterval(() => {
+        if (angryCount < 5) {
+          createSheepParticle(x + (Math.random() - 0.5) * 20, y - 10, angryEmojis[Math.floor(Math.random() * angryEmojis.length)]);
+          angryCount++;
+        } else {
+          clearInterval(angryInterval);
+        }
+      }, 450);
+      break;
+    }
+    // Whimsical actions
+    case 'dream': {
+      const dreamEmojis = ['💭', '🦄', '🌙', '✨', '🌟', '🌈'];
+      let dreamCount = 0;
+      const dreamInterval = setInterval(() => {
+        if (dreamCount < 6) {
+          createSheepParticle(x, y, dreamEmojis[Math.floor(Math.random() * dreamEmojis.length)]);
+          dreamCount++;
+        } else {
+          clearInterval(dreamInterval);
+        }
+      }, 600);
+      break;
+    }
+    case 'coffee': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 15 : -15), y + 5, '☕');
+      const coffeeEmojis = ['😊', '💨', '✨', '💪'];
+      let coffeeCount = 0;
+      const coffeeInterval = setInterval(() => {
+        if (coffeeCount < 4) {
+          createSheepParticle(x, y, coffeeEmojis[coffeeCount]);
+          coffeeCount++;
+        } else {
+          clearInterval(coffeeInterval);
+        }
+      }, 700);
+      break;
+    }
+    case 'photo': {
+      setTimeout(() => {
+        createSheepParticle(x, y, '✌️');
+      }, 500);
+      setTimeout(() => {
+        createSheepParticle(x + 30, y, '📸');
+        createSheepParticle(x, y, '✨');
+        createSheepParticle(x - 10, y - 10, '✨');
+        createSheepParticle(x + 10, y - 10, '✨');
+      }, 1500);
+      break;
+    }
+    case 'music': {
+      const instruments = ['🎸', '🎹', '🥁', '🎺', '🎻'];
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 15 : -15), y + 5, instruments[Math.floor(Math.random() * instruments.length)], 'eat');
+      const musicEmojis = ['🎵', '🎶', '✨'];
+      let musicCount = 0;
+      const musicInterval = setInterval(() => {
+        if (musicCount < 6) {
+          createSheepParticle(x + (Math.random() - 0.5) * 30, y, musicEmojis[Math.floor(Math.random() * musicEmojis.length)]);
+          musicCount++;
+        } else {
+          clearInterval(musicInterval);
+        }
+      }, 450);
+      break;
+    }
+    case 'butterfly': {
+      createSheepParticle(x, y, '🦋');
+      const butterflyEmojis = ['✨', '🌸', '🌼', '😊'];
+      let butterflyCount = 0;
+      const butterflyInterval = setInterval(() => {
+        if (butterflyCount < 4) {
+          createSheepParticle(x + (Math.random() - 0.5) * 20, y, butterflyEmojis[Math.floor(Math.random() * butterflyEmojis.length)]);
+          butterflyCount++;
+        } else {
+          clearInterval(butterflyInterval);
+        }
+      }, 600);
+      break;
+    }
+    case 'countingSheep': {
+      const countEmojis = ['🐑', '1️⃣', '🐑', '2️⃣', '🐑', '3️⃣', '💤'];
+      let countIndex = 0;
+      const countInterval = setInterval(() => {
+        if (countIndex < countEmojis.length) {
+          createSheepParticle(x, y, countEmojis[countIndex]);
+          countIndex++;
+        } else {
+          clearInterval(countInterval);
+        }
+      }, 500);
+      break;
+    }
+    case 'crown': {
+      setTimeout(() => createSheepParticle(x, y - 15, '👑'), 500);
+      const crownEmojis = ['✨', '🌟', '💎'];
+      let crownCount = 0;
+      const crownInterval = setInterval(() => {
+        if (crownCount < 5) {
+          createSheepParticle(x + (Math.random() - 0.5) * 30, y, crownEmojis[Math.floor(Math.random() * crownEmojis.length)]);
+          crownCount++;
+        } else {
+          clearInterval(crownInterval);
+        }
+      }, 500);
+      break;
+    }
+    case 'birthday': {
+      createSheepParticle(x, y - 10, '🎂');
+      const birthdayEmojis = ['🎁', '🎈', '🎉', '🎊', '✨'];
+      let birthdayCount = 0;
+      const birthdayInterval = setInterval(() => {
+        if (birthdayCount < 6) {
+          createSheepParticle(x + (Math.random() - 0.5) * 40, y, birthdayEmojis[Math.floor(Math.random() * birthdayEmojis.length)]);
+          birthdayCount++;
+        } else {
+          clearInterval(birthdayInterval);
+        }
+      }, 450);
+      break;
+    }
+    // Sports/Games
+    case 'soccer': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 25 : -25), y + 10, '⚽');
+      const soccerEmojis = ['🥅', '✨', '💪', '🏆'];
+      let soccerCount = 0;
+      const soccerInterval = setInterval(() => {
+        if (soccerCount < 4) {
+          createSheepParticle(x, y, soccerEmojis[Math.floor(Math.random() * soccerEmojis.length)]);
+          soccerCount++;
+        } else {
+          clearInterval(soccerInterval);
+        }
+      }, 600);
+      break;
+    }
+    case 'basketball': {
+      createSheepParticle(x, y - 20, '🏀');
+      setTimeout(() => createSheepParticle(x + 20, y - 30, '🏀'), 800);
+      setTimeout(() => {
+        createSheepParticle(x + 25, y - 35, '🏆');
+        createSheepParticle(x, y, '✨');
+      }, 1600);
+      break;
+    }
+    case 'golf': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 20 : -20), y + 5, '⛳');
+      setTimeout(() => {
+        createSheepParticle(x, y, '🏌️');
+      }, 800);
+      setTimeout(() => {
+        createSheepParticle(x + (sheep.classList.contains('flipped') ? 40 : -40), y - 20, '✨');
+      }, 1500);
+      break;
+    }
+    case 'tennis': {
+      const tennisEmojis = ['🎾', '🏸', '✨'];
+      let tennisCount = 0;
+      const tennisInterval = setInterval(() => {
+        if (tennisCount < 5) {
+          const side = tennisCount % 2 === 0 ? 25 : -25;
+          createSheepParticle(x + side, y, tennisEmojis[Math.floor(Math.random() * tennisEmojis.length)]);
+          tennisCount++;
+        } else {
+          clearInterval(tennisInterval);
+        }
+      }, 500);
+      break;
+    }
+    case 'bowling': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 30 : -30), y, '🎳');
+      setTimeout(() => {
+        createSheepParticle(x + (sheep.classList.contains('flipped') ? 40 : -40), y, '🎳');
+        createSheepParticle(x + (sheep.classList.contains('flipped') ? 35 : -35), y - 10, '🎳');
+        createSheepParticle(x, y, '✨');
+      }, 1500);
+      break;
+    }
+    case 'videoGames': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 15 : -15), y, '🎮');
+      const gameEmojis = ['👾', '🕹️', '✨', '🏆', '💯'];
+      let gameCount = 0;
+      const gameInterval = setInterval(() => {
+        if (gameCount < 5) {
+          createSheepParticle(x, y, gameEmojis[Math.floor(Math.random() * gameEmojis.length)]);
+          gameCount++;
+        } else {
+          clearInterval(gameInterval);
+        }
+      }, 500);
+      break;
+    }
+    // Food/Drink
+    case 'pizza': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 15 : -15), y + 5, '🍕');
+      const pizzaEmojis = ['😋', '🤤', '✨', '👌'];
+      let pizzaCount = 0;
+      const pizzaInterval = setInterval(() => {
+        if (pizzaCount < 4) {
+          createSheepParticle(x, y, pizzaEmojis[pizzaCount]);
+          pizzaCount++;
+        } else {
+          clearInterval(pizzaInterval);
+        }
+      }, 600);
+      break;
+    }
+    case 'iceCream': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 15 : -15), y, '🍦');
+      const iceCreamEmojis = ['🍨', '😋', '✨', '💕'];
+      let iceCreamCount = 0;
+      const iceCreamInterval = setInterval(() => {
+        if (iceCreamCount < 4) {
+          createSheepParticle(x, y, iceCreamEmojis[iceCreamCount]);
+          iceCreamCount++;
+        } else {
+          clearInterval(iceCreamInterval);
+        }
+      }, 600);
+      break;
+    }
+    case 'picnic': {
+      createSheepParticle(x, y + 15, '🧂');
+      const picnicEmojis = ['🥪', '🍎', '🧃', '🍓', '✨'];
+      let picnicCount = 0;
+      const picnicInterval = setInterval(() => {
+        if (picnicCount < 5) {
+          createSheepParticle(x + (Math.random() - 0.5) * 30, y + 10, picnicEmojis[Math.floor(Math.random() * picnicEmojis.length)], 'eat');
+          picnicCount++;
+        } else {
+          clearInterval(picnicInterval);
+        }
+      }, 550);
+      break;
+    }
+    case 'bbq': {
+      createSheepParticle(x + 20, y + 5, '🔥');
+      const bbqEmojis = ['🍖', '🍗', '💨', '✨', '😋'];
+      let bbqCount = 0;
+      const bbqInterval = setInterval(() => {
+        if (bbqCount < 5) {
+          createSheepParticle(x, y, bbqEmojis[Math.floor(Math.random() * bbqEmojis.length)]);
+          bbqCount++;
+        } else {
+          clearInterval(bbqInterval);
+        }
+      }, 550);
+      break;
+    }
+    // Seasonal/Holiday
+    case 'christmas': {
+      createSheepParticle(x, y - 15, '🎄');
+      const christmasEmojis = ['🎅', '🎁', '❄️', '✨', '🔔'];
+      let christmasCount = 0;
+      const christmasInterval = setInterval(() => {
+        if (christmasCount < 6) {
+          createSheepParticle(x + (Math.random() - 0.5) * 30, y, christmasEmojis[Math.floor(Math.random() * christmasEmojis.length)]);
+          christmasCount++;
+        } else {
+          clearInterval(christmasInterval);
+        }
+      }, 500);
+      break;
+    }
+    case 'valentine': {
+      const valentineEmojis = ['💘', '💌', '💝', '💗', '🌹'];
+      let valentineCount = 0;
+      const valentineInterval = setInterval(() => {
+        if (valentineCount < 6) {
+          createSheepParticle(x + (Math.random() - 0.5) * 30, y, valentineEmojis[Math.floor(Math.random() * valentineEmojis.length)]);
+          valentineCount++;
+        } else {
+          clearInterval(valentineInterval);
+        }
+      }, 500);
+      break;
+    }
+    case 'fireworks': {
+      const fireworkEmojis = ['🎆', '🎇', '✨', '🌟'];
+      let fireworkCount = 0;
+      const fireworkInterval = setInterval(() => {
+        if (fireworkCount < 8) {
+          createSheepParticle(x + (Math.random() - 0.5) * 50, y - 20 - Math.random() * 30, fireworkEmojis[Math.floor(Math.random() * fireworkEmojis.length)]);
+          fireworkCount++;
+        } else {
+          clearInterval(fireworkInterval);
+        }
+      }, 400);
+      break;
+    }
+    // Occupations
+    case 'detective': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 15 : -15), y, '🔍');
+      const detectiveEmojis = ['🕵️', '🔎', '🧐', '❓'];
+      let detectiveCount = 0;
+      const detectiveInterval = setInterval(() => {
+        if (detectiveCount < 4) {
+          createSheepParticle(x, y, detectiveEmojis[Math.floor(Math.random() * detectiveEmojis.length)]);
+          detectiveCount++;
+        } else {
+          clearInterval(detectiveInterval);
+        }
+      }, 650);
+      break;
+    }
+    case 'astronaut': {
+      createSheepParticle(x, y - 25, '🚀');
+      const spaceEmojis = ['🌙', '⭐', '🌟', '🪐', '✨'];
+      let spaceCount = 0;
+      const spaceInterval = setInterval(() => {
+        if (spaceCount < 6) {
+          createSheepParticle(x + (Math.random() - 0.5) * 40, y - 10, spaceEmojis[Math.floor(Math.random() * spaceEmojis.length)]);
+          spaceCount++;
+        } else {
+          clearInterval(spaceInterval);
+        }
+      }, 450);
+      break;
+    }
+    case 'doctor': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 15 : -15), y, '🩺');
+      const doctorEmojis = ['💊', '❤️‍🩹', '✨', '🧪'];
+      let doctorCount = 0;
+      const doctorInterval = setInterval(() => {
+        if (doctorCount < 4) {
+          createSheepParticle(x, y, doctorEmojis[doctorCount]);
+          doctorCount++;
+        } else {
+          clearInterval(doctorInterval);
+        }
+      }, 650);
+      break;
+    }
+    case 'pirate': {
+      createSheepParticle(x, y - 15, '🏴‍☠️');
+      const pirateEmojis = ['⚓', '🗺️', '💎', '🤜', '✨'];
+      let pirateCount = 0;
+      const pirateInterval = setInterval(() => {
+        if (pirateCount < 5) {
+          createSheepParticle(x + (Math.random() - 0.5) * 30, y, pirateEmojis[Math.floor(Math.random() * pirateEmojis.length)]);
+          pirateCount++;
+        } else {
+          clearInterval(pirateInterval);
+        }
+      }, 550);
+      break;
+    }
+    case 'wizard': {
+      createSheepParticle(x, y - 15, '🧙‍♂️');
+      const wizardEmojis = ['🪄', '📜', '✨', '🌟', '🔮'];
+      let wizardCount = 0;
+      const wizardInterval = setInterval(() => {
+        if (wizardCount < 5) {
+          createSheepParticle(x + (Math.random() - 0.5) * 30, y, wizardEmojis[Math.floor(Math.random() * wizardEmojis.length)]);
+          wizardCount++;
+        } else {
+          clearInterval(wizardInterval);
+        }
+      }, 500);
+      break;
+    }
+    case 'superhero': {
+      createSheepParticle(x, y - 15, '🦸');
+      const heroEmojis = ['💥', '⚡', '✨', '💪', '🌟'];
+      let heroCount = 0;
+      const heroInterval = setInterval(() => {
+        if (heroCount < 5) {
+          createSheepParticle(x + (Math.random() - 0.5) * 35, y, heroEmojis[Math.floor(Math.random() * heroEmojis.length)]);
+          heroCount++;
+        } else {
+          clearInterval(heroInterval);
+        }
+      }, 450);
+      break;
+    }
+    // Nature/Animals
+    case 'bee': {
+      const beeEmojis = ['🐝', '🌻', '🌸', '🌼'];
+      let beeCount = 0;
+      const beeInterval = setInterval(() => {
+        if (beeCount < 5) {
+          createSheepParticle(x + (Math.random() - 0.5) * 40, y + (Math.random() - 0.5) * 20, beeEmojis[Math.floor(Math.random() * beeEmojis.length)]);
+          beeCount++;
+        } else {
+          clearInterval(beeInterval);
+        }
+      }, 450);
+      setTimeout(() => createSheepParticle(x, y, '🍯'), 2500);
+      break;
+    }
+    case 'birdWatching': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 20 : -20), y, '🔭');
+      const birdEmojis = ['🐦', '🦜', '🦆', '🦉', '✨'];
+      let birdCount = 0;
+      const birdInterval = setInterval(() => {
+        if (birdCount < 5) {
+          createSheepParticle(x + (Math.random() - 0.5) * 50, y - 20, birdEmojis[Math.floor(Math.random() * birdEmojis.length)]);
+          birdCount++;
+        } else {
+          clearInterval(birdInterval);
+        }
+      }, 550);
+      break;
+    }
+    case 'frog': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 25 : -25), y + 10, '🐸');
+      const frogEmojis = ['💚', '✨', '🌿'];
+      let frogCount = 0;
+      const frogInterval = setInterval(() => {
+        if (frogCount < 3) {
+          createSheepParticle(x, y, frogEmojis[frogCount]);
+          frogCount++;
+        } else {
+          clearInterval(frogInterval);
+        }
+      }, 700);
+      break;
+    }
+    case 'ladybug': {
+      createSheepParticle(x, y, '🐞');
+      const ladybugEmojis = ['🍀', '✨', '😊'];
+      let ladybugCount = 0;
+      const ladybugInterval = setInterval(() => {
+        if (ladybugCount < 3) {
+          createSheepParticle(x + (Math.random() - 0.5) * 20, y, ladybugEmojis[ladybugCount]);
+          ladybugCount++;
+        } else {
+          clearInterval(ladybugInterval);
+        }
+      }, 700);
+      break;
+    }
+    // Tech/Modern
+    case 'texting': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 15 : -15), y + 5, '📱');
+      const textEmojis = ['💬', '😊', '👍', '❤️', '😂'];
+      let textCount = 0;
+      const textInterval = setInterval(() => {
+        if (textCount < 5) {
+          createSheepParticle(x, y, textEmojis[Math.floor(Math.random() * textEmojis.length)]);
+          textCount++;
+        } else {
+          clearInterval(textInterval);
+        }
+      }, 500);
+      break;
+    }
+    case 'streaming': {
+      createSheepParticle(x + 25, y, '📺');
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 15 : -15), y + 5, '🍿');
+      const streamEmojis = ['😂', '😮', '🤩', '✨'];
+      let streamCount = 0;
+      const streamInterval = setInterval(() => {
+        if (streamCount < 4) {
+          createSheepParticle(x, y, streamEmojis[streamCount]);
+          streamCount++;
+        } else {
+          clearInterval(streamInterval);
+        }
+      }, 650);
+      break;
+    }
+    case 'working': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 15 : -15), y + 5, '💻');
+      const workEmojis = ['📊', '📈', '⌨️', '💡', '☕'];
+      let workCount = 0;
+      const workInterval = setInterval(() => {
+        if (workCount < 5) {
+          createSheepParticle(x, y, workEmojis[Math.floor(Math.random() * workEmojis.length)]);
+          workCount++;
+        } else {
+          clearInterval(workInterval);
+        }
+      }, 550);
+      break;
+    }
+    case 'podcast': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 15 : -15), y - 5, '🎧');
+      const podcastEmojis = ['🎙️', '💬', '🤔', '👍', '✨'];
+      let podcastCount = 0;
+      const podcastInterval = setInterval(() => {
+        if (podcastCount < 4) {
+          createSheepParticle(x, y, podcastEmojis[podcastCount]);
+          podcastCount++;
+        } else {
+          clearInterval(podcastInterval);
+        }
+      }, 650);
+      break;
+    }
+    // Misc Fun
+    case 'balloon': {
+      createSheepParticle(x, y - 20, '🎈');
+      setTimeout(() => createSheepParticle(x, y - 30, '🎈'), 500);
+      setTimeout(() => {
+        createSheepParticle(x, y, '😮');
+        createSheepParticle(x, y - 40, '🎈');
+      }, 1000);
+      setTimeout(() => createSheepParticle(x, y, '😄'), 2000);
+      break;
+    }
+    case 'dizzy': {
+      const dizzyEmojis = ['😵‍💫', '💫', '🌀', '✨'];
+      let dizzyCount = 0;
+      const dizzyInterval = setInterval(() => {
+        if (dizzyCount < 6) {
+          createSheepParticle(x + (Math.random() - 0.5) * 30, y + (Math.random() - 0.5) * 20, dizzyEmojis[Math.floor(Math.random() * dizzyEmojis.length)]);
+          dizzyCount++;
+        } else {
+          clearInterval(dizzyInterval);
+        }
+      }, 400);
+      break;
+    }
+    case 'hiccup': {
+      const hiccupEmojis = ['🫨', '😯', '💨'];
+      let hiccupCount = 0;
+      const hiccupInterval = setInterval(() => {
+        if (hiccupCount < 5) {
+          createSheepParticle(x, y, hiccupEmojis[hiccupCount % hiccupEmojis.length]);
+          hiccupCount++;
+        } else {
+          clearInterval(hiccupInterval);
+        }
+      }, 600);
+      break;
+    }
+    case 'yawn': {
+      const yawnEmojis = ['🥱', '😴', '💤'];
+      let yawnCount = 0;
+      const yawnInterval = setInterval(() => {
+        if (yawnCount < 4) {
+          createSheepParticle(x, y, yawnEmojis[Math.floor(Math.random() * yawnEmojis.length)]);
+          yawnCount++;
+        } else {
+          clearInterval(yawnInterval);
+        }
+      }, 700);
+      break;
+    }
+    case 'whistle': {
+      const whistleEmojis = ['🎶', '😙', '💨', '🎵'];
+      let whistleCount = 0;
+      const whistleInterval = setInterval(() => {
+        if (whistleCount < 5) {
+          createSheepParticle(x + (sheep.classList.contains('flipped') ? 15 : -15), y - 5, whistleEmojis[Math.floor(Math.random() * whistleEmojis.length)]);
+          whistleCount++;
+        } else {
+          clearInterval(whistleInterval);
+        }
+      }, 450);
+      break;
+    }
+    case 'treasure': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 20 : -20), y + 10, '💰');
+      const treasureEmojis = ['💎', '🪙', '✨', '🌟', '🤩'];
+      let treasureCount = 0;
+      const treasureInterval = setInterval(() => {
+        if (treasureCount < 6) {
+          createSheepParticle(x + (Math.random() - 0.5) * 30, y, treasureEmojis[Math.floor(Math.random() * treasureEmojis.length)]);
+          treasureCount++;
+        } else {
+          clearInterval(treasureInterval);
+        }
+      }, 450);
+      break;
+    }
+    case 'timeTravel': {
+      const timeEmojis = ['⏰', '🌀', '✨', '🕰️', '🌟'];
+      let timeCount = 0;
+      const timeInterval = setInterval(() => {
+        if (timeCount < 6) {
+          createSheepParticle(x + (Math.random() - 0.5) * 40, y + (Math.random() - 0.5) * 30, timeEmojis[Math.floor(Math.random() * timeEmojis.length)]);
+          timeCount++;
+        } else {
+          clearInterval(timeInterval);
+        }
+      }, 400);
+      break;
+    }
+    case 'clone': {
+      const cloneEmojis = ['🐑', '🐑', '🐑', '✨'];
+      let cloneCount = 0;
+      const cloneInterval = setInterval(() => {
+        if (cloneCount < 4) {
+          createSheepParticle(x + (cloneCount - 1.5) * 25, y, cloneEmojis[cloneCount]);
+          cloneCount++;
+        } else {
+          clearInterval(cloneInterval);
+        }
+      }, 500);
+      break;
+    }
+  }
+}
+
+function pickRandomAction() {
+  const totalWeight = sheepActions.reduce((sum, a) => sum + a.weight, 0);
+  let random = Math.random() * totalWeight;
+  for (const action of sheepActions) {
+    random -= action.weight;
+    if (random <= 0) return action.name;
+  }
+  return sheepActions[0].name;
+}
+
 function createRogueSheep() {
   const sheep = document.createElement('div');
   sheep.className = 'rogue-sheep';
   sheep.textContent = Math.random() < 0.5 ? '🐑' : '🐏';
   
   // 1% chance of being a black sheep
-  if (Math.random() < 0.01) {
+  const isBlackSheep = Math.random() < 0.01;
+  if (isBlackSheep) {
     sheep.classList.add('black-sheep');
   }
   
@@ -4132,6 +5227,11 @@ function createRogueSheep() {
   const maxDuration = 15000 + Math.random() * 30000;
   const startTime = Date.now();
 
+  // Action state
+  let isPaused = false;
+  let hasPerformedAction = false;
+  const willPerformAction = Math.random() < 0.1; // 10% chance
+
   const moveInterval = setInterval(() => {
     // Check if sheep has been wandering too long
     if (Date.now() - startTime > maxDuration) {
@@ -4140,6 +5240,27 @@ function createRogueSheep() {
       activeSheep = activeSheep.filter(s => s !== sheep);
       return;
     }
+
+    // Check if we should pause for an action (10% chance, only once, after being on screen a bit)
+    if (willPerformAction && !hasPerformedAction && !isPaused && Date.now() - startTime > 3000) {
+      // Only perform action if sheep is visible on screen
+      if (currentX > 50 && currentX < viewWidth - 50 && currentY > 50 && currentY < viewHeight - 50) {
+        isPaused = true;
+        hasPerformedAction = true;
+        const action = pickRandomAction();
+        performSheepAction(sheep, action, isBlackSheep, currentX, currentY);
+        
+        // Resume after random duration (3-8 seconds)
+        const pauseDuration = 3000 + Math.random() * 5000;
+        setTimeout(() => {
+          isPaused = false;
+        }, pauseDuration);
+        return;
+      }
+    }
+
+    // Skip movement if paused
+    if (isPaused) return;
 
     // Add random wandering to direction
     angle += (Math.random() - 0.5) * turnRate * wanderStrength;
