@@ -5774,8 +5774,8 @@ function createRogueSheep() {
         const action = pickRandomAction();
         performSheepAction(sheep, action, isBlackSheep, currentX, currentY);
         
-        // Resume after action duration (10-15 seconds)
-        const pauseDuration = 10000 + Math.random() * 5000;
+        // Resume after action duration (10-20 seconds)
+        const pauseDuration = 10000 + Math.random() * 10000;
         behaviorEndTime = Date.now() + pauseDuration;
         setTimeout(() => {
           isPaused = false;
