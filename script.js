@@ -5648,6 +5648,10 @@ function createRogueSheep() {
   sheep.className = 'rogue-sheep';
   sheep.textContent = Math.random() < 0.5 ? '🐑' : '🐏';
   
+  // Random size variation (75%-125%)
+  const sizeScale = 0.75 + Math.random() * 0.5;
+  sheep.style.fontSize = `${32 * sizeScale}px`;
+  
   // 1% chance of being a black sheep
   const isBlackSheep = Math.random() < 0.01;
   if (isBlackSheep) {
@@ -5690,8 +5694,12 @@ function createRogueSheep() {
   sheep.style.left = `${x}px`;
   sheep.style.top = `${y}px`;
 
-  // Base movement parameters
-  const baseSpeed = 1.5 + Math.random() * 2; // 1.5-3.5 pixels per step
+  // Base movement parameters - scale speed with screen size for consistent time on screen
+  // Reference diagonal: 1500px (typical desktop). Speed scales proportionally.
+  const screenDiagonal = Math.sqrt(viewWidth * viewWidth + viewHeight * viewHeight);
+  const referenceDiagonal = 1500;
+  const speedScale = screenDiagonal / referenceDiagonal;
+  const baseSpeed = (1.5 + Math.random() * 2) * speedScale; // 1.5-3.5 pixels/step scaled to screen
   const stepInterval = 40; // Fixed interval for consistent behavior
   
   // Initial direction toward center (accounting for safe area at bottom)
