@@ -5661,10 +5661,10 @@ function createRogueSheep() {
   const viewHeight = window.innerHeight;
 
   // Random starting position (off-screen)
-  const side = Math.floor(Math.random() * 4); // 0: top, 1: right, 2: bottom, 3: left
+  const entrySide = Math.floor(Math.random() * 4); // 0: top, 1: right, 2: bottom, 3: left
   let x, y;
 
-  switch (side) {
+  switch (entrySide) {
     case 0: // Enter from top
       x = Math.random() * viewWidth;
       y = -40;
@@ -5687,114 +5687,239 @@ function createRogueSheep() {
   sheep.style.left = `${x}px`;
   sheep.style.top = `${y}px`;
 
-  // Random speed (pixels per step) - varied speeds
-  const speed = 1 + Math.random() * 4; // 1-5 pixels per step
-  const stepInterval = 30 + Math.random() * 70; // 30-100ms per step (slower = more leisurely)
-
-  // Initial direction should point toward the center of the screen (with some randomness)
+  // Base movement parameters
+  const baseSpeed = 1.5 + Math.random() * 2; // 1.5-3.5 pixels per step
+  const stepInterval = 40; // Fixed interval for consistent behavior
+  
+  // Initial direction toward center
   const centerX = viewWidth / 2;
   const centerY = viewHeight / 2;
-  // Angle toward center with +/- 45 degrees of randomness
-  let angle = Math.atan2(centerY - y, centerX - x) + (Math.random() - 0.5) * Math.PI * 0.5;
+  let angle = Math.atan2(centerY - y, centerX - x) + (Math.random() - 0.5) * Math.PI * 0.3;
   let currentX = x;
   let currentY = y;
-
-  // Track direction for flipping
   let lastX = x;
 
-  // Wandering parameters
-  const turnRate = 0.1 + Math.random() * 0.2; // How much the sheep can turn each step
-  const wanderStrength = 0.3 + Math.random() * 0.4; // Randomness in direction changes
-
-  // Maximum time on screen (15-45 seconds)
-  const maxDuration = 15000 + Math.random() * 30000;
+  // Timing
   const startTime = Date.now();
+  const exitPhaseStart = 60000 + Math.random() * 40000; // Start exiting between 60-100 seconds
 
-  // Action state
+  // ===== BEHAVIOR STATE SYSTEM =====
+  // Weights: purposeful=2, wandering=2, grazing=2, curious=2, trotting=2, performing=1 (half odds)
+  let currentBehavior = 'purposeful'; // Always start purposeful to enter screen
+  let behaviorEndTime = Date.now() + 3000 + Math.random() * 2000; // First behavior 3-5 seconds
+  let targetX = centerX + (Math.random() - 0.5) * viewWidth * 0.5;
+  let targetY = centerY + (Math.random() - 0.5) * viewHeight * 0.5;
+  let loopAngle = 0; // For curious looping behavior
+  let loopDirection = Math.random() < 0.5 ? 1 : -1;
+  
+  // ===== OSCILLATING PARAMETERS =====
+  let oscillatorPhase = Math.random() * Math.PI * 2;
+  const oscillatorSpeed = 0.001 + Math.random() * 0.002; // How fast parameters oscillate
+
+  // Action/performing state
   let isPaused = false;
-  let hasPerformedAction = false;
-  const willPerformAction = Math.random() < 0.1; // 10% chance
 
-  const moveInterval = setInterval(() => {
-    // Check if sheep has been wandering too long
-    if (Date.now() - startTime > maxDuration) {
-      clearInterval(moveInterval);
-      sheep.remove();
-      activeSheep = activeSheep.filter(s => s !== sheep);
+  // Exit target (chosen when exit phase begins)
+  let exitTarget = null;
+
+  function pickNewBehavior() {
+    const timeOnScreen = Date.now() - startTime;
+    
+    // If in exit phase, become purposeful toward exit
+    if (timeOnScreen > exitPhaseStart && !exitTarget) {
+      // Pick a random edge to exit from
+      const exitSide = Math.floor(Math.random() * 4);
+      switch (exitSide) {
+        case 0: exitTarget = { x: Math.random() * viewWidth, y: -60 }; break;
+        case 1: exitTarget = { x: viewWidth + 60, y: Math.random() * viewHeight }; break;
+        case 2: exitTarget = { x: Math.random() * viewWidth, y: viewHeight + 60 }; break;
+        case 3: exitTarget = { x: -60, y: Math.random() * viewHeight }; break;
+      }
+    }
+    
+    if (exitTarget) {
+      currentBehavior = 'exiting';
       return;
     }
-
-    // Check if we should pause for an action (10% chance, only once, after being on screen a bit)
-    if (willPerformAction && !hasPerformedAction && !isPaused && Date.now() - startTime > 3000) {
-      // Only perform action if sheep is visible on screen
+    
+    // Pick random behavior with weights (performing has half the odds)
+    // Total weight: 2+2+2+2+2+1 = 11
+    const rand = Math.random() * 11;
+    if (rand < 2) {
+      currentBehavior = 'purposeful';
+      // Pick a new target point on screen
+      targetX = 100 + Math.random() * (viewWidth - 200);
+      targetY = 100 + Math.random() * (viewHeight - 200);
+    } else if (rand < 4) {
+      currentBehavior = 'wandering';
+    } else if (rand < 6) {
+      currentBehavior = 'grazing';
+    } else if (rand < 8) {
+      currentBehavior = 'curious';
+      loopDirection = Math.random() < 0.5 ? 1 : -1;
+      loopAngle = 0;
+    } else if (rand < 10) {
+      currentBehavior = 'trotting';
+    } else {
+      // Performing action (weight 1, half odds) - only if on screen
       if (currentX > 50 && currentX < viewWidth - 50 && currentY > 50 && currentY < viewHeight - 50) {
+        currentBehavior = 'performing';
         isPaused = true;
-        hasPerformedAction = true;
         const action = pickRandomAction();
         performSheepAction(sheep, action, isBlackSheep, currentX, currentY);
         
-        // Resume after random duration (10-15 seconds)
+        // Resume after action duration (10-15 seconds)
         const pauseDuration = 10000 + Math.random() * 5000;
+        behaviorEndTime = Date.now() + pauseDuration;
         setTimeout(() => {
           isPaused = false;
         }, pauseDuration);
         return;
+      } else {
+        // Not on screen, fall back to purposeful
+        currentBehavior = 'purposeful';
+        targetX = 100 + Math.random() * (viewWidth - 200);
+        targetY = 100 + Math.random() * (viewHeight - 200);
+      }
+    }
+    
+    // Set duration for this behavior (5-15 seconds)
+    behaviorEndTime = Date.now() + 5000 + Math.random() * 10000;
+  }
+
+  const moveInterval = setInterval(() => {
+    const timeOnScreen = Date.now() - startTime;
+
+    if (isPaused) return;
+
+    // Check if it's time to switch behaviors
+    if (Date.now() > behaviorEndTime) {
+      pickNewBehavior();
+    }
+
+    // Update oscillating parameters
+    oscillatorPhase += oscillatorSpeed * stepInterval;
+    const oscillation = Math.sin(oscillatorPhase);
+    
+    // Calculate movement based on current behavior
+    let speed = baseSpeed;
+    let turnAmount = 0;
+    
+    switch (currentBehavior) {
+      case 'purposeful': {
+        // Walk toward target with minor drift
+        const angleToTarget = Math.atan2(targetY - currentY, targetX - currentX);
+        let angleDiff = angleToTarget - angle;
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+        turnAmount = angleDiff * 0.1;
+        speed = baseSpeed * (1 + oscillation * 0.2);
+        
+        // If close to target, pick new behavior
+        if (Math.hypot(targetX - currentX, targetY - currentY) < 50) {
+          behaviorEndTime = 0; // Trigger behavior change
+        }
+        break;
+      }
+      
+      case 'wandering': {
+        // Gentle random turns with oscillating intensity
+        const wanderStrength = 0.3 + oscillation * 0.2;
+        turnAmount = (Math.random() - 0.5) * 0.15 * wanderStrength;
+        speed = baseSpeed * (0.8 + oscillation * 0.3);
+        
+        // Occasional bigger turn
+        if (Math.random() < 0.01) {
+          turnAmount += (Math.random() - 0.5) * 0.5;
+        }
+        break;
+      }
+      
+      case 'grazing': {
+        // Very slow, lots of tiny movements, nearly stationary
+        turnAmount = (Math.random() - 0.5) * 0.3;
+        speed = baseSpeed * 0.2 * (0.5 + Math.random() * 0.5);
+        
+        // Sometimes stop completely
+        if (Math.random() < 0.3) {
+          speed = 0;
+        }
+        break;
+      }
+      
+      case 'curious': {
+        // Small loops/circles
+        loopAngle += 0.05 * loopDirection;
+        turnAmount = 0.08 * loopDirection + (Math.random() - 0.5) * 0.05;
+        speed = baseSpeed * 0.7;
+        
+        // Complete a few loops then stop
+        if (Math.abs(loopAngle) > Math.PI * 3) {
+          behaviorEndTime = 0;
+        }
+        break;
+      }
+      
+      case 'trotting': {
+        // Fast and straight
+        turnAmount = (Math.random() - 0.5) * 0.05;
+        speed = baseSpeed * 1.8;
+        break;
+      }
+      
+      case 'exiting': {
+        // Head straight for exit point
+        const angleToExit = Math.atan2(exitTarget.y - currentY, exitTarget.x - currentX);
+        let angleDiff = angleToExit - angle;
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+        turnAmount = angleDiff * 0.15;
+        speed = baseSpeed * 1.2;
+        break;
       }
     }
 
-    // Skip movement if paused
-    if (isPaused) return;
-
-    // Add random wandering to direction
-    angle += (Math.random() - 0.5) * turnRate * wanderStrength;
-
-    // Occasionally make bigger direction changes
-    if (Math.random() < 0.02) {
-      angle += (Math.random() - 0.5) * Math.PI * 0.5;
+    // Apply turn
+    angle += turnAmount;
+    
+    // Edge avoidance (only when not exiting and in first 30 seconds)
+    if (currentBehavior !== 'exiting' && timeOnScreen < 30000) {
+      const edgeMargin = 80;
+      let edgePush = 0;
+      if (currentX < edgeMargin) edgePush = Math.max(edgePush, (edgeMargin - currentX) / edgeMargin);
+      if (currentX > viewWidth - edgeMargin) edgePush = Math.max(edgePush, (currentX - (viewWidth - edgeMargin)) / edgeMargin);
+      if (currentY < edgeMargin) edgePush = Math.max(edgePush, (edgeMargin - currentY) / edgeMargin);
+      if (currentY > viewHeight - edgeMargin) edgePush = Math.max(edgePush, (currentY - (viewHeight - edgeMargin)) / edgeMargin);
+      
+      if (edgePush > 0) {
+        const angleToCenter = Math.atan2(centerY - currentY, centerX - currentX);
+        let angleDiff = angleToCenter - angle;
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+        angle += angleDiff * edgePush * 0.08;
+      }
     }
 
-    // Gently steer away from edges (push toward center)
-    const edgeMargin = 100;
-    const centerX = viewWidth / 2;
-    const centerY = viewHeight / 2;
-    const angleToCenter = Math.atan2(centerY - currentY, centerX - currentX);
-    
-    // Calculate how far into the edge zone we are (0 = not in zone, 1 = at edge)
-    let edgePush = 0;
-    if (currentX < edgeMargin) edgePush = Math.max(edgePush, (edgeMargin - currentX) / edgeMargin);
-    if (currentX > viewWidth - edgeMargin) edgePush = Math.max(edgePush, (currentX - (viewWidth - edgeMargin)) / edgeMargin);
-    if (currentY < edgeMargin) edgePush = Math.max(edgePush, (edgeMargin - currentY) / edgeMargin);
-    if (currentY > viewHeight - edgeMargin) edgePush = Math.max(edgePush, (currentY - (viewHeight - edgeMargin)) / edgeMargin);
-    
-    // Blend current angle toward center based on how close to edge
-    if (edgePush > 0) {
-      // Calculate shortest rotation direction to angleToCenter
-      let angleDiff = angleToCenter - angle;
-      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-      angle += angleDiff * edgePush * 0.15;
-    }
-
-    // Move in current direction
+    // Move
     currentX += Math.cos(angle) * speed;
     currentY += Math.sin(angle) * speed;
 
-    // Add slight wobble for natural walking
-    const wobbleX = (Math.random() - 0.5) * 2;
-    const wobbleY = (Math.random() - 0.5) * 2;
+    // Slight wobble
+    const wobbleX = (Math.random() - 0.5) * 1.5;
+    const wobbleY = (Math.random() - 0.5) * 1.5;
 
     sheep.style.left = `${currentX + wobbleX}px`;
     sheep.style.top = `${currentY + wobbleY}px`;
 
-    // Flip sheep based on movement direction (sheep emoji faces left by default)
-    if (currentX > lastX + 0.5) {
+    // Flip based on direction
+    if (currentX > lastX + 0.3) {
       sheep.classList.add('flipped');
-    } else if (currentX < lastX - 0.5) {
+    } else if (currentX < lastX - 0.3) {
       sheep.classList.remove('flipped');
     }
     lastX = currentX;
 
-    // Remove if sheep wanders off screen
+    // Remove if off screen
     if (currentX < -60 || currentX > viewWidth + 60 ||
         currentY < -60 || currentY > viewHeight + 60) {
       clearInterval(moveInterval);
