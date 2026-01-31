@@ -5691,8 +5691,11 @@ function createRogueSheep() {
   const speed = 1 + Math.random() * 4; // 1-5 pixels per step
   const stepInterval = 30 + Math.random() * 70; // 30-100ms per step (slower = more leisurely)
 
-  // Random initial direction (angle in radians)
-  let angle = Math.random() * Math.PI * 2;
+  // Initial direction should point toward the center of the screen (with some randomness)
+  const centerX = viewWidth / 2;
+  const centerY = viewHeight / 2;
+  // Angle toward center with +/- 45 degrees of randomness
+  let angle = Math.atan2(centerY - y, centerX - x) + (Math.random() - 0.5) * Math.PI * 0.5;
   let currentX = x;
   let currentY = y;
 
@@ -5750,12 +5753,27 @@ function createRogueSheep() {
       angle += (Math.random() - 0.5) * Math.PI * 0.5;
     }
 
-    // Gently steer away from edges
+    // Gently steer away from edges (push toward center)
     const edgeMargin = 100;
-    if (currentX < edgeMargin) angle += 0.1;
-    if (currentX > viewWidth - edgeMargin) angle -= 0.1;
-    if (currentY < edgeMargin) angle += (angle > 0 && angle < Math.PI) ? 0.1 : -0.1;
-    if (currentY > viewHeight - edgeMargin) angle += (angle > Math.PI) ? 0.1 : -0.1;
+    const centerX = viewWidth / 2;
+    const centerY = viewHeight / 2;
+    const angleToCenter = Math.atan2(centerY - currentY, centerX - currentX);
+    
+    // Calculate how far into the edge zone we are (0 = not in zone, 1 = at edge)
+    let edgePush = 0;
+    if (currentX < edgeMargin) edgePush = Math.max(edgePush, (edgeMargin - currentX) / edgeMargin);
+    if (currentX > viewWidth - edgeMargin) edgePush = Math.max(edgePush, (currentX - (viewWidth - edgeMargin)) / edgeMargin);
+    if (currentY < edgeMargin) edgePush = Math.max(edgePush, (edgeMargin - currentY) / edgeMargin);
+    if (currentY > viewHeight - edgeMargin) edgePush = Math.max(edgePush, (currentY - (viewHeight - edgeMargin)) / edgeMargin);
+    
+    // Blend current angle toward center based on how close to edge
+    if (edgePush > 0) {
+      // Calculate shortest rotation direction to angleToCenter
+      let angleDiff = angleToCenter - angle;
+      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+      angle += angleDiff * edgePush * 0.15;
+    }
 
     // Move in current direction
     currentX += Math.cos(angle) * speed;
