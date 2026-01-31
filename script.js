@@ -5718,6 +5718,7 @@ function createRogueSheep() {
 
   // Action/performing state
   let isPaused = false;
+  let isFirstBehaviorChange = true; // Prevent trotting on first change
 
   // Exit target (chosen when exit phase begins)
   let exitTarget = null;
@@ -5759,7 +5760,12 @@ function createRogueSheep() {
       loopDirection = Math.random() < 0.5 ? 1 : -1;
       loopAngle = 0;
     } else if (rand < 10) {
-      currentBehavior = 'trotting';
+      // Don't trot on first behavior change (sheep just entered)
+      if (isFirstBehaviorChange) {
+        currentBehavior = 'wandering';
+      } else {
+        currentBehavior = 'trotting';
+      }
     } else {
       // Performing action (weight 1, half odds) - only if on screen
       if (currentX > 50 && currentX < viewWidth - 50 && currentY > 50 && currentY < viewHeight - 50) {
@@ -5785,6 +5791,7 @@ function createRogueSheep() {
     
     // Set duration for this behavior (5-15 seconds)
     behaviorEndTime = Date.now() + 5000 + Math.random() * 10000;
+    isFirstBehaviorChange = false;
   }
 
   const moveInterval = setInterval(() => {
@@ -5911,9 +5918,10 @@ function createRogueSheep() {
     currentX += Math.cos(angle) * speed;
     currentY += Math.sin(angle) * speed;
 
-    // Slight wobble
-    const wobbleX = (Math.random() - 0.5) * 1.5;
-    const wobbleY = (Math.random() - 0.5) * 1.5;
+    // Slight wobble - intensity scales with speed
+    const wobbleIntensity = 0.4 + (speed / baseSpeed) * 0.8; // 0.4-1.2 based on speed ratio
+    const wobbleX = (Math.random() - 0.5) * wobbleIntensity;
+    const wobbleY = (Math.random() - 0.5) * wobbleIntensity;
 
     sheep.style.left = `${currentX + wobbleX}px`;
     sheep.style.top = `${currentY + wobbleY}px`;
