@@ -5701,7 +5701,7 @@ function createRogueSheep() {
 
   // Timing
   const startTime = Date.now();
-  const exitPhaseStart = 60000 + Math.random() * 40000; // Start exiting between 60-100 seconds
+  const exitPhaseStart = 45000 + Math.random() * 15000; // Start exiting between 45-60 seconds
 
   // ===== BEHAVIOR STATE SYSTEM =====
   // Weights: purposeful=2, wandering=2, grazing=2, curious=2, trotting=2, performing=1 (half odds)
@@ -5867,6 +5867,13 @@ function createRogueSheep() {
         break;
       }
       
+      case 'performing': {
+        // Stationary during action (shouldn't reach here due to isPaused check)
+        speed = 0;
+        turnAmount = 0;
+        break;
+      }
+      
       case 'exiting': {
         // Head straight for exit point
         const angleToExit = Math.atan2(exitTarget.y - currentY, exitTarget.x - currentX);
@@ -5882,8 +5889,8 @@ function createRogueSheep() {
     // Apply turn
     angle += turnAmount;
     
-    // Edge avoidance (only when not exiting and in first 30 seconds)
-    if (currentBehavior !== 'exiting' && timeOnScreen < 30000) {
+    // Edge avoidance (only when not exiting and in first 5 seconds)
+    if (currentBehavior !== 'exiting' && timeOnScreen < 5000) {
       const edgeMargin = 80;
       let edgePush = 0;
       if (currentX < edgeMargin) edgePush = Math.max(edgePush, (edgeMargin - currentX) / edgeMargin);
