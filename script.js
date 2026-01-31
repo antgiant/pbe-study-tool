@@ -4073,6 +4073,12 @@ function createRogueSheep() {
   const sheep = document.createElement('div');
   sheep.className = 'rogue-sheep';
   sheep.textContent = Math.random() < 0.5 ? '🐑' : '🐏';
+  
+  // 1% chance of being a black sheep
+  if (Math.random() < 0.01) {
+    sheep.classList.add('black-sheep');
+  }
+  
   sheep.setAttribute('aria-hidden', 'true');
   document.body.appendChild(sheep);
 

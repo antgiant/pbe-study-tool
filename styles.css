@@ -677,3 +677,12 @@ input[data-question-type-percentage]:invalid {
 .rogue-sheep.flipped {
   transform: scaleX(-1);
 }
+
+.rogue-sheep.black-sheep {
+  filter: brightness(0.2) saturate(0.5);
+}
+
+.rogue-sheep.black-sheep.flipped {
+  transform: scaleX(-1);
+  filter: brightness(0.2) saturate(0.5);
+}
