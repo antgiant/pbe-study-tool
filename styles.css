@@ -783,3 +783,38 @@ input[data-question-type-percentage]:invalid {
   90% { opacity: 1; }
   100% { opacity: 0; }
 }
+
+/* Confetti celebration */
+.confetti {
+  position: fixed;
+  width: 10px;
+  height: 10px;
+  z-index: 10000;
+  pointer-events: none;
+  animation: confetti-fall linear forwards;
+}
+
+.confetti.square {
+  border-radius: 2px;
+}
+
+.confetti.circle {
+  border-radius: 50%;
+}
+
+.confetti.strip {
+  width: 4px;
+  height: 16px;
+  border-radius: 2px;
+}
+
+@keyframes confetti-fall {
+  0% {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(100vh) rotate(720deg) scale(0.5);
+  }
+}

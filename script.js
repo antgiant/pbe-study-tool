@@ -3385,6 +3385,33 @@ const showAnswer = () => {
   answerPrevButton.disabled = false;
 };
 
+// Confetti celebration when questions loop
+function triggerConfetti() {
+  const colors = [
+    '#ff6b6b', '#feca57', '#48dbfb', '#ff9ff3', '#54a0ff',
+    '#5f27cd', '#00d2d3', '#ff9f43', '#10ac84', '#ee5a24',
+    '#c8d6e5', '#ffd32a', '#ff3838', '#3ae374', '#17c0eb'
+  ];
+  const shapes = ['square', 'circle', 'strip'];
+  const confettiCount = 150;
+  
+  for (let i = 0; i < confettiCount; i++) {
+    const confetti = document.createElement('div');
+    const shape = shapes[Math.floor(Math.random() * shapes.length)];
+    confetti.className = `confetti ${shape}`;
+    confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+    confetti.style.left = `${Math.random() * 100}vw`;
+    confetti.style.top = `${-20 - Math.random() * 20}px`;
+    confetti.style.animationDuration = `${2 + Math.random() * 3}s`;
+    confetti.style.animationDelay = `${Math.random() * 0.5}s`;
+    confetti.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(confetti);
+    
+    // Remove confetti after animation
+    setTimeout(() => confetti.remove(), 6000);
+  }
+}
+
 const goNext = () => {
   if (!sessionActive || questionOrder.length === 0) return;
   if (questionIndex < questionOrder.length - 1) {
@@ -3399,6 +3426,7 @@ const goNext = () => {
     questionBlankedWordsList = blanksData.map(data => data.blankedWords);
     hintsRevealedList = blanksData.map(() => 0);
     questionIndex = 0;
+    triggerConfetti();
   }
   updateQuestionView();
 };
@@ -3427,6 +3455,7 @@ const goNextFromAnswer = () => {
     questionBlankedWordsList = blanksData.map(data => data.blankedWords);
     hintsRevealedList = blanksData.map(() => 0);
     questionIndex = 0;
+    triggerConfetti();
   }
   updateQuestionView();
 };
@@ -4171,6 +4200,21 @@ const sheepActions = [
   { name: 'scooter', weight: 1 },
   { name: 'tractor', weight: 1 },
   { name: 'rocket', weight: 1 },
+  // Animal Encounters
+  { name: 'meetDog', weight: 1 },
+  { name: 'meetCow', weight: 1 },
+  { name: 'meetHorse', weight: 1 },
+  { name: 'meetGoat', weight: 1 },
+  { name: 'meetPig', weight: 1 },
+  { name: 'meetChicken', weight: 1 },
+  { name: 'meetDuck', weight: 1 },
+  { name: 'meetCat', weight: 1 },
+  { name: 'meetRabbit', weight: 1 },
+  { name: 'meetDeer', weight: 1 },
+  { name: 'meetDonkey', weight: 1 },
+  { name: 'meetOwl', weight: 1 },
+  { name: 'meetMouse', weight: 1 },
+  { name: 'meetLlama', weight: 1 },
 ];
 
 function createSheepParticle(x, y, emoji, type = 'rise') {
@@ -5387,6 +5431,203 @@ function performSheepAction(sheep, actionName, isBlackSheep, currentX, currentY)
           clearInterval(rocketInterval);
         }
       }, 400);
+      break;
+    }
+    // Animal Encounter actions
+    case 'meetDog': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 35 : -35), y, '🐕');
+      const dogConvo = ['💬', '🐶', '👋', '😊', '🐾', '❤️'];
+      let dogCount = 0;
+      const dogInterval = setInterval(() => {
+        if (dogCount < dogConvo.length) {
+          createSheepParticle(x + (dogCount % 2 === 0 ? 0 : (sheep.classList.contains('flipped') ? 25 : -25)), y - 10, dogConvo[dogCount]);
+          dogCount++;
+        } else {
+          clearInterval(dogInterval);
+        }
+      }, 700);
+      break;
+    }
+    case 'meetCow': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 40 : -40), y, '🐄');
+      const cowConvo = ['💬', '🦛', '🌾', '😊', '🥛', '✨'];
+      let cowCount = 0;
+      const cowInterval = setInterval(() => {
+        if (cowCount < cowConvo.length) {
+          createSheepParticle(x + (cowCount % 2 === 0 ? 0 : (sheep.classList.contains('flipped') ? 30 : -30)), y - 10, cowConvo[cowCount]);
+          cowCount++;
+        } else {
+          clearInterval(cowInterval);
+        }
+      }, 700);
+      break;
+    }
+    case 'meetHorse': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 40 : -40), y, '🐎');
+      const horseConvo = ['💬', '🐴', '🌿', '😄', '🏇', '✨'];
+      let horseCount = 0;
+      const horseInterval = setInterval(() => {
+        if (horseCount < horseConvo.length) {
+          createSheepParticle(x + (horseCount % 2 === 0 ? 0 : (sheep.classList.contains('flipped') ? 30 : -30)), y - 10, horseConvo[horseCount]);
+          horseCount++;
+        } else {
+          clearInterval(horseInterval);
+        }
+      }, 700);
+      break;
+    }
+    case 'meetGoat': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 35 : -35), y, '🐐');
+      const goatConvo = ['💬', '🐐', '🤝', '😄', '🌿', '💕'];
+      let goatCount = 0;
+      const goatInterval = setInterval(() => {
+        if (goatCount < goatConvo.length) {
+          createSheepParticle(x + (goatCount % 2 === 0 ? 0 : (sheep.classList.contains('flipped') ? 25 : -25)), y - 10, goatConvo[goatCount]);
+          goatCount++;
+        } else {
+          clearInterval(goatInterval);
+        }
+      }, 700);
+      break;
+    }
+    case 'meetPig': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 35 : -35), y, '🐖');
+      const pigConvo = ['💬', '🐷', '😋', '😄', '🌽', '❤️'];
+      let pigCount = 0;
+      const pigInterval = setInterval(() => {
+        if (pigCount < pigConvo.length) {
+          createSheepParticle(x + (pigCount % 2 === 0 ? 0 : (sheep.classList.contains('flipped') ? 25 : -25)), y - 10, pigConvo[pigCount]);
+          pigCount++;
+        } else {
+          clearInterval(pigInterval);
+        }
+      }, 700);
+      break;
+    }
+    case 'meetChicken': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 30 : -30), y + 5, '🐔');
+      const chickenConvo = ['💬', '🐣', '🥚', '😄', '🌾', '✨'];
+      let chickenCount = 0;
+      const chickenInterval = setInterval(() => {
+        if (chickenCount < chickenConvo.length) {
+          createSheepParticle(x + (chickenCount % 2 === 0 ? 0 : (sheep.classList.contains('flipped') ? 20 : -20)), y - 10, chickenConvo[chickenCount]);
+          chickenCount++;
+        } else {
+          clearInterval(chickenInterval);
+        }
+      }, 650);
+      break;
+    }
+    case 'meetDuck': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 30 : -30), y + 5, '🦆');
+      const duckConvo = ['💬', '🦆', '💦', '😄', '🌿', '💛'];
+      let duckCount = 0;
+      const duckInterval = setInterval(() => {
+        if (duckCount < duckConvo.length) {
+          createSheepParticle(x + (duckCount % 2 === 0 ? 0 : (sheep.classList.contains('flipped') ? 20 : -20)), y - 10, duckConvo[duckCount]);
+          duckCount++;
+        } else {
+          clearInterval(duckInterval);
+        }
+      }, 650);
+      break;
+    }
+    case 'meetCat': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 30 : -30), y + 5, '🐈');
+      const catConvo = ['💬', '🐱', '😺', '😄', '💤', '❤️'];
+      let catCount = 0;
+      const catInterval = setInterval(() => {
+        if (catCount < catConvo.length) {
+          createSheepParticle(x + (catCount % 2 === 0 ? 0 : (sheep.classList.contains('flipped') ? 20 : -20)), y - 10, catConvo[catCount]);
+          catCount++;
+        } else {
+          clearInterval(catInterval);
+        }
+      }, 700);
+      break;
+    }
+    case 'meetRabbit': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 28 : -28), y + 8, '🐇');
+      const rabbitConvo = ['💬', '🐰', '🥕', '😄', '🌿', '💕'];
+      let rabbitCount = 0;
+      const rabbitInterval = setInterval(() => {
+        if (rabbitCount < rabbitConvo.length) {
+          createSheepParticle(x + (rabbitCount % 2 === 0 ? 0 : (sheep.classList.contains('flipped') ? 18 : -18)), y - 10, rabbitConvo[rabbitCount]);
+          rabbitCount++;
+        } else {
+          clearInterval(rabbitInterval);
+        }
+      }, 650);
+      break;
+    }
+    case 'meetDeer': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 40 : -40), y, '🦌');
+      const deerConvo = ['💬', '🦌', '🌲', '😊', '🌿', '✨'];
+      let deerCount = 0;
+      const deerInterval = setInterval(() => {
+        if (deerCount < deerConvo.length) {
+          createSheepParticle(x + (deerCount % 2 === 0 ? 0 : (sheep.classList.contains('flipped') ? 30 : -30)), y - 10, deerConvo[deerCount]);
+          deerCount++;
+        } else {
+          clearInterval(deerInterval);
+        }
+      }, 750);
+      break;
+    }
+    case 'meetDonkey': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 40 : -40), y, '🫎');
+      const donkeyConvo = ['💬', '🫎', '🌾', '😄', '🤝', '❤️'];
+      let donkeyCount = 0;
+      const donkeyInterval = setInterval(() => {
+        if (donkeyCount < donkeyConvo.length) {
+          createSheepParticle(x + (donkeyCount % 2 === 0 ? 0 : (sheep.classList.contains('flipped') ? 30 : -30)), y - 10, donkeyConvo[donkeyCount]);
+          donkeyCount++;
+        } else {
+          clearInterval(donkeyInterval);
+        }
+      }, 700);
+      break;
+    }
+    case 'meetOwl': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 25 : -25), y - 15, '🦉');
+      const owlConvo = ['💬', '🦉', '🌙', '😊', '💡', '✨'];
+      let owlCount = 0;
+      const owlInterval = setInterval(() => {
+        if (owlCount < owlConvo.length) {
+          createSheepParticle(x + (owlCount % 2 === 0 ? 0 : (sheep.classList.contains('flipped') ? 15 : -15)), y - 20, owlConvo[owlCount]);
+          owlCount++;
+        } else {
+          clearInterval(owlInterval);
+        }
+      }, 750);
+      break;
+    }
+    case 'meetMouse': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 20 : -20), y + 12, '🐁');
+      const mouseConvo = ['💬', '🐭', '🧀', '😄', '👋', '💕'];
+      let mouseCount = 0;
+      const mouseInterval = setInterval(() => {
+        if (mouseCount < mouseConvo.length) {
+          createSheepParticle(x + (mouseCount % 2 === 0 ? 0 : (sheep.classList.contains('flipped') ? 12 : -12)), y - 5, mouseConvo[mouseCount]);
+          mouseCount++;
+        } else {
+          clearInterval(mouseInterval);
+        }
+      }, 600);
+      break;
+    }
+    case 'meetLlama': {
+      createSheepParticle(x + (sheep.classList.contains('flipped') ? 40 : -40), y - 5, '🦙');
+      const llamaConvo = ['💬', '🦙', '✨', '😄', '🌿', '🤝', '💕'];
+      let llamaCount = 0;
+      const llamaInterval = setInterval(() => {
+        if (llamaCount < llamaConvo.length) {
+          createSheepParticle(x + (llamaCount % 2 === 0 ? 0 : (sheep.classList.contains('flipped') ? 30 : -30)), y - 15, llamaConvo[llamaCount]);
+          llamaCount++;
+        } else {
+          clearInterval(llamaInterval);
+        }
+      }, 650);
       break;
     }
   }
