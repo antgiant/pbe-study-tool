@@ -1813,7 +1813,6 @@ const verseStatusFor = (chapterKey, verseId) => {
 const isSelectionComplete = (selection, entry) => {
   const verseIds = entry?.verseIds || [];
   const status = entry?.status;
-  const verseCount = entry?.verseCount;
 
   const downloaded = new Set(
     verseIds
@@ -1822,12 +1821,14 @@ const isSelectionComplete = (selection, entry) => {
   );
 
   if (!selection || selection.allSelected === true || selection.all === true) {
+    // status READY is only ever set after a full chapter fetch succeeds, so it
+    // already guarantees every verse the API has for this chapter is stored.
+    // Do NOT additionally require downloaded.size >= entry.verseCount: that
+    // count can come from book metadata (books.json) which may be wrong for a
+    // given book/chapter, permanently blocking a fully-downloaded chapter from
+    // ever being treated as selectable.
     if (status !== STATUS.READY) return false;
-    if (downloaded.size === 0) return false;
-    if (Number.isFinite(verseCount)) {
-      return downloaded.size >= verseCount;
-    }
-    return true;
+    return downloaded.size > 0;
   }
 
   const selected = selection.selectedVerses || selection.verses || [];

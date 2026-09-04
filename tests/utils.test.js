@@ -539,8 +539,18 @@ describe('verse download helpers', () => {
 
   it('isSelectionComplete should require full chapter when allSelected', () => {
     const verseIds = ['23,5,1', '23,5,2', '23,5,3'];
-    expect(isSelectionComplete({ allSelected: true }, verseIds, STATUS.PARTIAL, 3)).toBe(false);
-    expect(isSelectionComplete({ allSelected: true }, verseIds, STATUS.READY, 3)).toBe(true);
+    expect(isSelectionComplete({ allSelected: true }, verseIds, STATUS.PARTIAL)).toBe(false);
+    expect(isSelectionComplete({ allSelected: true }, verseIds, STATUS.READY)).toBe(true);
+  });
+
+  it('isSelectionComplete should trust a READY chapter even if book metadata overstates the verse count', () => {
+    // Regression test: a chapter whose full fetch succeeded (status READY) must
+    // be treated as selectable even when stale/incorrect book metadata implies
+    // there should be more verses than were actually downloaded (e.g. 3 John's
+    // verse count being off by one). Otherwise the chapter can never be
+    // selected and the Start button stays permanently disabled.
+    const verseIds = ['64,1,1', '64,1,2', '64,1,3'];
+    expect(isSelectionComplete({ allSelected: true }, verseIds, STATUS.READY)).toBe(true);
   });
 
   it('isSelectionComplete should validate individual verse selections', () => {
