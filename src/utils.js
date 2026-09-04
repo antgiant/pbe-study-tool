@@ -288,25 +288,24 @@ export const buildVerseDownloadPlan = (activeChapters = [], verseSelections = {}
  * @param {Object|null} selection - verse selection for a chapter
  * @param {string[]} verseIds - downloaded verse ids for the chapter
  * @param {string} status - chapter status
- * @param {number|null|undefined} verseCount - known verse count (optional)
  * @returns {boolean}
  */
-export const isSelectionComplete = (selection, verseIds = [], status, verseCount) => {
+export const isSelectionComplete = (selection, verseIds = [], status) => {
   const downloaded = new Set(
     verseIds
       .map((id) => Number(id?.split?.(',')?.[2]))
       .filter((n) => Number.isFinite(n))
   );
 
-  // Chapter mode or allSelected requires the full chapter to be ready
+  // Chapter mode or allSelected requires the full chapter to be ready.
+  // status READY is only ever set after a full chapter fetch succeeds, so it
+  // already guarantees every verse the API has for this chapter is stored.
+  // Do NOT additionally require downloaded.size >= verseCount: that count can
+  // come from book metadata that may be wrong for a given book/chapter,
+  // permanently blocking a fully-downloaded chapter from ever being selectable.
   if (!selection || selection.allSelected === true || selection.all === true) {
     if (status !== STATUS.READY) return false;
-    const hasAny = downloaded.size > 0;
-    if (!hasAny) return false;
-    if (Number.isFinite(verseCount)) {
-      return downloaded.size >= verseCount;
-    }
-    return true;
+    return downloaded.size > 0;
   }
 
   const selected = selection.selectedVerses || selection.verses || [];
