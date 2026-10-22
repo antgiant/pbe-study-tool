@@ -14,6 +14,7 @@
 - `index.html`, `script.js`, `styles.css`: main UI and behavior.
 - `src/utils.js`: pure functions for text processing and scoring.
 - `src/database.js`: IndexedDB storage helpers.
+- `src/migration.js`: hand-off to the PBE Quiz Builder (export link, redirect date).
 - `tests/`: Vitest test suite (unit + integration).
 
 ## Testing Requirements

@@ -30,6 +30,13 @@ import {
   NONE_PRESET_ID,
   NONE_PRESET_NAME,
 } from './src/database.js';
+import {
+  QUIZ_BUILDER_URL,
+  buildExportPayload,
+  buildQuizUrl,
+  formatRedirectDate,
+  shouldRedirect,
+} from './src/migration.js';
 
 const seasonSelect = document.getElementById('year');
 const chapterSelector = document.getElementById('chapter-selector');
@@ -6001,6 +6008,29 @@ if (rogueSheepCheckbox) {
   });
 }
 
+// Fill in the blank practice has moved to the quiz builder: link there with this
+// person's presets, and send them there once the redirect date has passed
+async function setupMigration() {
+  const button = document.getElementById('migration-button');
+  const link = document.getElementById('migration-link');
+  const date = document.getElementById('migration-date');
+  if (date) date.textContent = formatRedirectDate();
+
+  let url = QUIZ_BUILDER_URL;
+  try {
+    const presets = await getAllPresets();
+    url = buildQuizUrl(
+      buildExportPayload({ presets, current: getCurrentPresetState(), noneId: NONE_PRESET_ID })
+    );
+  } catch (err) {
+    console.warn('Could not prepare presets for the quiz builder:', err);
+  }
+
+  if (button) button.href = url;
+  if (link) link.href = url;
+  if (shouldRedirect()) window.location.replace(url);
+}
+
 // Initialize app with async state loading
 if (shouldAutoInit) {
   (async () => {
@@ -6075,5 +6105,6 @@ if (shouldAutoInit) {
     toggleChapterSelector();
     validateQuestionTypePercentages();
     requestPersistentStorage();
+    await setupMigration();
   })();
 }
