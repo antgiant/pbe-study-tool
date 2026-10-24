@@ -841,6 +841,7 @@ input[data-question-type-percentage]:invalid {
 }
 
 .migration-banner p {
+  color: inherit;
   margin: 0;
   flex: 1 1 22rem;
 }
