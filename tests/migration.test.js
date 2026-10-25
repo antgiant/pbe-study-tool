@@ -114,6 +114,6 @@ describe('redirect date', () => {
   });
 
   it('formats the date for the banner', () => {
-    expect(formatRedirectDate()).toBe('January 1, 2027');
+    expect(formatRedirectDate()).toBe('May 1, 2027');
   });
 });

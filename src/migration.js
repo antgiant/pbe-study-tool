@@ -11,7 +11,7 @@ export const EXPORT_SCHEMA = 'pbe.study.export.v1';
 // Keeps the link well inside what browsers and the quiz builder accept
 export const MAX_ENCODED_LENGTH = 300000;
 
-export const REDIRECT_AFTER = '2027-01-01T00:00:00Z';
+export const REDIRECT_AFTER = '2027-05-01T00:00:00Z';
 
 const PRESET_FIELDS = [
   'year',
@@ -104,7 +104,7 @@ export const shouldRedirect = (now = new Date(), after = REDIRECT_AFTER) => now.
 /**
  * @param {string} after - ISO date
  * @param {string} locale
- * @returns {string} Human-readable redirect date, e.g. "January 1, 2027"
+ * @returns {string} Human-readable redirect date, e.g. "May 1, 2027"
  */
 export const formatRedirectDate = (after = REDIRECT_AFTER, locale = 'en-US') =>
   new Date(after).toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
